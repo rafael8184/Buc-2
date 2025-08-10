@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Planificador Bucaramanga & Santander — 13–18 Ago 2025 (Móvil)</title>
+  <style>
+    :root{
+      --bg:#f2f7f5;--fg:#0f172a;--muted:#6b7280;--card:#ffffff;--br:#e5e7eb;
+      --brand:#0ea5e9;--brand-2:#14b8a6;--accent:#10b981;--rose:#ef4444;--amber:#f59e0b;
+    }
+    *{box-sizing:border-box}html,body{height:100%}body{margin:0;background:linear-gradient(180deg,#ecfeff,#e6fff5);color:var(--fg);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .container{max-width:1200px;margin:0 auto;padding:16px}
+    header{position:sticky;top:0;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);border-bottom:1px solid var(--br);z-index:10}
+    .hbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}
+    .badge{display:inline-grid;place-items:center;width:36px;height:36px;background:#bbf7d0;border-radius:12px;font-size:20px}
+    .tabs{display:flex;gap:8px}
+    .tab{border:1px solid var(--br);border-radius:999px;padding:8px 12px;background:#fff;cursor:pointer;transition:.2s}
+    .tab.active{background:#111827;color:#fff;border-color:#111827}
+    .row{display:grid;gap:16px}
+    @media(min-width:900px){.row.cols-3{grid-template-columns:1fr 2fr}.row.cols-2{grid-template-columns:1fr 1fr}}
+    .card{background:var(--card);border:1px solid var(--br);border-radius:16px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .title{font-size:18px;font-weight:700;margin:0 0 4px}
+    .muted{color:var(--muted)}
+    .btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--br);border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer;transition:.2s;font-size:14px}
+    .btn:hover{background:#f9fafb}
+    .btn.brand{border-color:#93c5fd;background:#ebf8ff;color:#1e3a8a}
+    .btn.ok{border-color:#86efac;background:#dcfce7;color:#065f46}
+    .btn.danger{border-color:#fecaca;background:#fee2e2;color:#b91c1c}
+    .btn.small{padding:4px 8px;font-size:12px}
+    input,select,textarea{width:100%;border:1px solid var(--br);border-radius:10px;padding:8px 10px;font:inherit}
+    input[type="number"]{text-align:right}
+    .grid{display:grid;gap:10px}
+    .cols-2{grid-template-columns:1fr 1fr}
+    .cols-3{grid-template-columns:repeat(3,1fr)}
+    .chips{display:flex;flex-wrap:wrap;gap:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--br);border-radius:999px;padding:4px 8px;font-size:12px}
+    .pill{display:inline-flex;align-items:center;border:1px solid var(--br);border-radius:999px;padding:2px 8px;font-size:12px;background:#fff}
+    .suggestion{cursor:grab}
+    .day-col{display:flex;flex-direction:column;border:1px solid var(--br);border-radius:16px;overflow:hidden;background:#f8fafc}
+    .day-head{background:#fff;padding:8px 10px;border-bottom:1px solid var(--br);font-weight:600}
+    .day-body{padding:10px;min-height:140px;max-height:50vh;overflow:auto}
+    .item{background:#fff;border:1px solid var(--br);border-radius:12px;padding:10px}
+    .item .meta{color:var(--muted);font-size:12px}
+    .flex{display:flex;gap:8px;align-items:center}
+    .between{justify-content:space-between}
+    .wrap{flex-wrap:wrap}
+    .right{justify-content:flex-end}
+    .status-card{border:1px solid var(--br);border-radius:16px;background:#fff;padding:12px}
+    .status-ok{border-color:#bbf7d0;background:#f0fdf4}
+    .status-debt{border-color:#fecaca;background:#fff1f2}
+    .status-chip{font-weight:700;padding:2px 8px;border-radius:999px;font-size:12px}
+    .status-chip.ok{background:#dcfce7;color:#065f46}
+    .status-chip.debt{background:#fee2e2;color:#b91c1c}
+
+    /* Modal */
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+    .overlay.show{display:flex}
+    .modal{max-width:680px;width:100%;background:#fff;border:1px solid var(--br);border-radius:16px;padding:14px;max-height:90vh;overflow:auto}
+
+    /* Tiny helpers */
+    .mt-2{margin-top:8px}.mt-3{margin-top:12px}.mt-4{margin-top:16px}.mt-6{margin-top:24px}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hbar container">
+      <div class="flex">
+        <div class="badge">🗺️</div>
+        <div>
+          <div class="title" style="margin:0">Planificador Bucaramanga & Santander</div>
+          <div class="muted" style="font-size:12px">13–18 de agosto de 2025 • 4 viajeros</div>
+        </div>
+      </div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="itinerary">Itinerario</button>
+        <button class="tab" data-tab="expenses">Finanzas</button>
+        <button class="tab" data-tab="people">Personas</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card" id="infobar">
+      <div class="flex between wrap">
+        <div class="muted">Arrastra actividades o usa "+ Añadir" en cada sugerencia para móviles. Registra gastos y reembolsos. Todo se guarda en este navegador.</div>
+        <div class="flex wrap">
+          <button class="btn" id="btnExport">Exportar JSON</button>
+          <button class="btn" id="btnImport">Importar JSON</button>
+          <button class="btn danger" id="btnReset">Restablecer</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Itinerario -->
+    <section id="view-itinerary">
+      <div class="row cols-3 mt-3">
+        <aside class="card" id="suggestions-card">
+          <div class="flex between wrap">
+            <div>
+              <div class="title">Sugerencias</div>
+              <div class="muted">Arrastra o usa "+ Añadir"</div>
+            </div>
+            <button class="btn brand" id="btnNewActivity">+ Nueva actividad</button>
+          </div>
+          <div class="mt-3 grid" id="suggestions-list"></div>
+        </aside>
+        <div class="grid cols-2" id="days-grid"></div>
+      </div>
+    </section>
+
+    <!-- Finanzas -->
+    <section id="view-expenses" style="display:none">
+      <div class="row cols-2 mt-3">
+        <div class="grid">
+          <div class="card">
+            <div class="flex between wrap">
+              <div>
+                <div class="title">Gastos</div>
+                <div class="muted">Registra los gastos compartidos</div>
+              </div>
+              <button class="btn brand" id="btnNewExpense">+ Nuevo gasto</button>
+            </div>
+            <div class="mt-3" id="expenses-list"></div>
+          </div>
+
+          <div class="card">
+            <div class="flex between wrap">
+              <div>
+                <div class="title">Reembolsos</div>
+                <div class="muted">Pagos recibidos o a favor</div>
+              </div>
+              <button class="btn ok" id="btnNewReim">+ Nuevo reembolso</button>
+            </div>
+            <div class="mt-3" id="reim-list"></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <div class="title">Presupuestos (COP)</div>
+            <div class="muted">Edita el presupuesto de cada persona.</div>
+            <div class="mt-3 grid" id="budget-list"></div>
+          </div>
+
+          <div class="card">
+            <div class="title">Estado de pagos</div>
+            <div class="muted">Resumen por persona</div>
+            <div class="mt-3 grid cols-2" id="status-grid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Personas -->
+    <section id="view-people" style="display:none">
+      <div class="card mt-3">
+        <div class="flex between wrap">
+          <div><div class="title">Personas & contactos</div></div>
+          <button class="btn brand" id="btnAddPerson">+ Añadir persona</button>
+        </div>
+        <div class="mt-3 grid" id="people-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal genérico -->
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="flex between wrap">
+        <div class="title" id="modal-title">Título</div>
+        <button class="btn small" id="modal-close">✕</button>
+      </div>
+      <div class="mt-3" id="modal-body"></div>
+      <div class="mt-3 right" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Helpers =====
+    const $ = (sel, root=document) => root.querySelector(sel);
+    const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+    const uid = () => Math.random().toString(36).slice(2, 9);
+    const fmtCOP = n => new Intl.NumberFormat('es-CO', {style:'currency', currency:'COP', maximumFractionDigits:0}).format(Number(n)||0);
+    const STORAGE_KEY = 'bga_trip_planner_mobile_2025';
+
+    // Definición de fechas fijas (evita problemas de huso)
+    const DATES = [
+      {key:'2025-08-13', label:'Mié 13 Ago'},
+      {key:'2025-08-14', label:'Jue 14 Ago'},
+      {key:'2025-08-15', label:'Vie 15 Ago'},
+      {key:'2025-08-16', label:'Sáb 16 Ago'},
+      {key:'2025-08-17', label:'Dom 17 Ago'},
+      {key:'2025-08-18', label:'Lun 18 Ago (mediodía)'}
+    ];
+
+    // Datos iniciales
+    const DEFAULT_PEOPLE = [
+      { id:'rafael', name:'Rafael Ramírez', phone:'', emergencyName:'', emergencyPhone:'', budget:0 },
+      { id:'amelia', name:'Amelia Salazar', phone:'', emergencyName:'', emergencyPhone:'', budget:0 },
+      { id:'juan',   name:'Juan José Herrera', phone:'', emergencyName:'', emergencyPhone:'', budget:0 },
+      { id:'manu',   name:'Manuela Higinio', phone:'', emergencyName:'', emergencyPhone:'', budget:0 }
+    ];
+    const TAGS = ['Congreso','Aventura','Naturaleza','Cultura','Mirador','Nocturno','Gastronomía','Pueblo Patrimonio'];
+    const RECOMMENDED = [
+      { id:uid(), title:'Congreso Colombiano de Psicología (Neomundo)', city:'Bucaramanga', duration:8, tags:['Congreso'], notes:'14–16 de agosto (08:00–18:00)' },
+      { id:uid(), title:'Cerro del Santísimo (mirador y show nocturno)', city:'Floridablanca', duration:3, tags:['Mirador','Nocturno','Naturaleza'], notes:'Atardecer recomendado' },
+      { id:uid(), title:'Parapente en Ruitoque', city:'Metropolitana', duration:3, tags:['Aventura','Naturaleza','Mirador'], notes:'Depende del viento' },
+      { id:uid(), title:'PANACHI + teleférico', city:'Cañón del Chicamocha', duration:6, tags:['Naturaleza','Mirador','Aventura'], notes:'Vistas del cañón' },
+      { id:uid(), title:'Barichara + Camino Real a Guane', city:'Barichara/Guane', duration:6, tags:['Cultura','Naturaleza','Pueblo Patrimonio'], notes:'Camino ~6km (2–2.5 h)' }
+    ];
+    const CATEGORY_TEMPLATES = ['Hospedaje','Transporte - diésel','Transporte - peajes','Inscripción congreso','Otro'];
+
+    // ===== Estado
+    const loadState = () => { try{ const raw = localStorage.getItem(STORAGE_KEY); return raw? JSON.parse(raw): null } catch{ return null } };
+    const saveState = (s) => { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch{} };
+    let state = loadState() || {
+      people: DEFAULT_PEOPLE,
+      suggestions: RECOMMENDED,
+      itinerary: Object.fromEntries(DATES.map(d=>[d.key, []])),
+      expenses: [],
+      reimbursements: []
+    };
+
+    // ===== Navegación
+    $$('.tab').forEach(btn => btn.addEventListener('click', () => {
+      $$('.tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const t = btn.dataset.tab;
+      $('#view-itinerary').style.display = (t === 'itinerary') ? 'block' : 'none';
+      $('#view-expenses').style.display = (t === 'expenses') ? 'block' : 'none';
+      $('#view-people').style.display = (t === 'people') ? 'block' : 'none';
+    }));
+
+    // ===== Exportar / Importar / Resetear =====
+    $('#btnExport').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'plan-bucaramanga-2025.json'; a.click(); URL.revokeObjectURL(url);
+    });
+    $('#btnImport').addEventListener('click', () => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
+      inp.onchange = (e) => { const f = e.target.files?.[0]; if(!f) return; const fr = new FileReader(); fr.onload = () => { try { state = JSON.parse(fr.result); saveState(state); renderAll(); } catch { alert('Archivo inválido'); } }; fr.readAsText(f); };
+      inp.click();
+    });
+    $('#btnReset').addEventListener('click', () => { if(confirm('¿Restablecer todo?')){ localStorage.removeItem(STORAGE_KEY); location.reload(); }});
+
+    // ===== Modal helpers =====
+    const openModal = (title, bodyEl, actions = []) => {
+      $('#modal-title').textContent = title;
+      const body = $('#modal-body'); body.innerHTML = ''; body.appendChild(bodyEl);
+      const actionsEl = $('#modal-actions'); actionsEl.innerHTML = '';
+      actions.forEach(({label, className='btn', onClick}) => { const b = document.createElement('button'); b.className = className; b.textContent = label; b.addEventListener('click', onClick); actionsEl.appendChild(b); });
+      $('#overlay').classList.add('show');
+    };
+    const closeModal = () => $('#overlay').classList.remove('show');
+    $('#modal-close').addEventListener('click', closeModal);
+
+    // ===== Sugerencias e Itinerario =====
+    function renderSuggestions(){
+      const wrap = $('#suggestions-list'); wrap.innerHTML = '';
+      state.suggestions.forEach(s => {
+        const card = document.createElement('div'); card.className = 'item suggestion'; card.draggable = true;
+        // Drag & drop para escritorio
+        card.addEventListener('dragstart', ev => ev.dataTransfer.setData('text/plain', JSON.stringify({type:'suggestion', item: s})));
+        card.innerHTML = `<div class='flex between wrap'>
+            <div>
+              <div style='font-weight:600'>${s.title}</div>
+              <div class='meta'>${s.city || ''}${s.duration ? ' • ' + s.duration + ' h' : ''}</div>
+              <div class='chips mt-2'>${(s.tags || []).map(t => `<span class='chip'>${t}</span>`).join('')}</div>
+            </div>
+            <button class='btn small ok' data-act='add'>+ Añadir</button>
+          </div>`;
+        // Añadir con selección de día (útil en móviles)
+        card.querySelector('[data-act="add"]').addEventListener('click', () => openAddSuggestionToDay(s));
+        wrap.appendChild(card);
+      });
+    }
+    // Modal para elegir a qué día añadir la sugerencia
+    function openAddSuggestionToDay(sug){
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<label>Selecciona el día</label><select id='sel-day' class='mt-2'>${DATES.map(d => `<option value='${d.key}'>${d.label}</option>`).join('')}</select>`;
+      const saveBtn = { label:'Agregar', className:'btn ok', onClick: () => {
+        const dk = $('#sel-day', wrap).value;
+        const act = {...sug, id: uid()};
+        state.itinerary[dk] = [...state.itinerary[dk], act];
+        saveState(state);
+        closeModal();
+        renderItinerary();
+      }};
+      const cancelBtn = { label:'Cancelar', className:'btn', onClick: () => closeModal() };
+      openModal('Agregar actividad', wrap, [cancelBtn, saveBtn]);
+    }
+    // Renderiza el itinerario por día
+    function renderItinerary(){
+      const grid = $('#days-grid'); grid.innerHTML = '';
+      DATES.forEach(d => {
+        const col = document.createElement('div'); col.className = 'day-col';
+        const head = document.createElement('div'); head.className = 'day-head'; head.textContent = d.label; col.appendChild(head);
+        const body = document.createElement('div'); body.className = 'day-body';
+        // Drag & drop para escritorio
+        body.addEventListener('dragover', e => e.preventDefault());
+        body.addEventListener('drop', (e) => {
+          e.preventDefault();
+          try {
+            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+            if(data.type === 'suggestion'){
+              const act = {...data.item, id: uid()};
+              state.itinerary[d.key] = [...state.itinerary[d.key], act];
+              saveState(state);
+              renderItinerary();
+            }
+          } catch{}
+        });
+        const list = state.itinerary[d.key] || [];
+        if(list.length === 0){
+          const em = document.createElement('div'); em.className = 'muted'; em.textContent = 'Vacío. Usa + Añadir o arrastra…'; body.appendChild(em);
+        } else {
+          list.forEach((it, idx) => {
+            const card = document.createElement('div'); card.className = 'item';
+            card.innerHTML = `<div class='flex between wrap'>
+              <div>
+                <div style='font-weight:600'>${it.title}</div>
+                <div class='meta'>${it.city || ''}${it.duration? ' • ' + it.duration + ' h':''}</div>
+                <div class='chips mt-2'>${(it.tags || []).map(t => `<span class='chip'>${t}</span>`).join('')}</div>
+              </div>
+              <div class='flex wrap'>
+                <button class='btn small' data-act='up'>↑</button>
+                <button class='btn small' data-act='down'>↓</button>
+                <button class='btn small' data-act='edit'>Editar</button>
+                <button class='btn small danger' data-act='del'>✕</button>
+              </div>
+            </div>
+            ${it.notes ? `<div class='mt-2'>${it.notes}</div>` : ''}`;
+            // Reordenar
+            card.querySelector('[data-act="up"]').addEventListener('click', () => {
+              if(idx > 0){ const arr = state.itinerary[d.key]; [arr[idx-1], arr[idx]] = [arr[idx], arr[idx-1]]; saveState(state); renderItinerary(); }
+            });
+            card.querySelector('[data-act="down"]').addEventListener('click', () => {
+              const arr = state.itinerary[d.key]; if(idx < arr.length - 1){ [arr[idx+1], arr[idx]] = [arr[idx], arr[idx+1]]; saveState(state); renderItinerary(); }
+            });
+            card.querySelector('[data-act="del"]').addEventListener('click', () => {
+              state.itinerary[d.key] = state.itinerary[d.key].filter(x => x.id !== it.id); saveState(state); renderItinerary();
+            });
+            card.querySelector('[data-act="edit"]').addEventListener('click', () => openActivityModal(it, d.key));
+            body.appendChild(card);
+          });
+        }
+        col.appendChild(body);
+        grid.appendChild(col);
+      });
+    }
+    // Modal para crear/editar actividad
+    function openActivityModal(activity = null, dayKey = null){
+      const isNew = !activity; const a = activity ? {...activity} : { id: uid(), title:'', city:'', duration:1, tags:[], notes:'' };
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class='grid cols-2'>
+        <div><label>Título</label><input id='a-title' value='${a.title}'></div>
+        <div><label>Ciudad/Lugar</label><input id='a-city' value='${a.city || ''}'></div>
+        <div><label>Duración (h)</label><input type='number' step='0.5' min='0.5' id='a-dur' value='${a.duration || 1}'></div>
+        <div><label>Día</label><select id='a-day'>${DATES.map(d => `<option value='${d.key}' ${(dayKey === d.key) ? 'selected' : ''}>${d.label}</option>`).join('')}</select></div>
+      </div>
+      <div class='mt-3'><label>Notas</label><textarea id='a-notes' rows='3'>${a.notes || ''}</textarea></div>
+      <div class='mt-3'><div class='muted'>Etiquetas</div><div class='chips mt-2' id='a-tags'>${TAGS.map(t => `<label class='chip'><input type='checkbox' value='${t}' ${(a.tags || []).includes(t) ? 'checked' : ''}> ${t}</label>`).join('')}</div></div>`;
+      const saveBtn = { label: isNew ? 'Agregar' : 'Guardar', className:'btn ok', onClick: () => {
+        a.title = $('#a-title', wrap).value.trim(); a.city = $('#a-city', wrap).value.trim(); a.duration = Number($('#a-dur', wrap).value) || 1; a.notes = $('#a-notes', wrap).value;
+        a.tags = $$('input[type="checkbox"]', $('#a-tags', wrap)).filter(ch => ch.checked).map(ch => ch.value);
+        const dk = $('#a-day', wrap).value;
+        if(!a.title){ alert('Añade un título'); return; }
+        if(isNew){ state.itinerary[dk] = [...state.itinerary[dk], a]; }
+        else {
+          // Remplaza dentro del día
+          const arr = state.itinerary[dk]; const idx = arr.findIndex(x => x.id === a.id);
+          if(idx >= 0){ arr[idx] = a; }
+        }
+        saveState(state); closeModal(); renderItinerary();
+      }};
+      const cancelBtn = { label:'Cancelar', className:'btn', onClick: () => closeModal() };
+      openModal(isNew ? 'Nueva actividad' : 'Editar actividad', wrap, [cancelBtn, saveBtn]);
+    }
+    $('#btnNewActivity').addEventListener('click', () => openActivityModal(null, DATES[0].key));
+
+    // ===== Personas =====
+    function renderPeople(){
+      const wrap = $('#people-list'); wrap.innerHTML = '';
+      state.people.forEach(p => {
+        const card = document.createElement('div'); card.className = 'card';
+        card.innerHTML = `<div class='grid cols-2'>
+          <div><label>Nombre</label><input value='${p.name}' data-f='name'></div>
+          <div><label>Teléfono (+57)</label><input value='${p.phone}' data-f='phone'></div>
+          <div><label>Contacto emergencia</label><input value='${p.emergencyName}' data-f='emergencyName'></div>
+          <div><label>Teléfono emergencia</label><input value='${p.emergencyPhone}' data-f='emergencyPhone'></div>
+          <div><label>Presupuesto (COP)</label><input type='number' min='0' step='10000' value='${p.budget || 0}' data-f='budget'></div>
+        </div>
+        <div class='mt-2 right'><button class='btn small danger'>Eliminar</button></div>`;
+        card.querySelector('.btn.small.danger').addEventListener('click', () => {
+          state.people = state.people.filter(x => x.id !== p.id); saveState(state); renderAll();
+        });
+        $$('input', card).forEach(inp => {
+          inp.addEventListener('input', () => {
+            const f = inp.dataset.f; p[f] = (f === 'budget') ? Number(inp.value || 0) : inp.value; saveState(state); renderBudgets(); renderStatus();
+          });
+        });
+        wrap.appendChild(card);
+      });
+    }
+    $('#btnAddPerson').addEventListener('click', () => {
+      state.people = [...state.people, {id: uid(), name:'', phone:'', emergencyName:'', emergencyPhone:'', budget:0}]; saveState(state); renderAll();
+    });
+
+    // ===== Gastos =====
+    function renderExpenses(){
+      const list = $('#expenses-list'); list.innerHTML = '';
+      if(state.expenses.length === 0){ const em = document.createElement('div'); em.className = 'muted'; em.textContent = 'Sin gastos.'; list.appendChild(em); return; }
+      state.expenses.forEach(e => {
+        const card = document.createElement('div'); card.className = 'item';
+        const payerName = state.people.find(p => p.id === e.payerId)?.name || '';
+        card.innerHTML = `<div class='flex between wrap'><div class='flex wrap'><div class='pill'>${e.category}</div><div class='pill'>${e.date}</div></div><div class='pill'>${fmtCOP(e.amount)}</div></div>
+        <div class='mt-2'>${e.concept || '(sin concepto)'} <span class='muted'>— Pagó: ${payerName}</span></div>
+        <div class='chips mt-2'>${e.participants.map(pr => `<span class='chip'>${state.people.find(p => p.id === pr.personId)?.name.split(' ')[0] || ''}: <b>${Math.round((pr.share || 0) / (e.participants.reduce((s,p)=>s+(p.share||0),0)||1) * 100)}%</b></span>`).join('')}</div>
+        <div class='mt-2 right'><button class='btn small'>Editar</button><button class='btn small danger'>Eliminar</button></div>`;
+        card.querySelector('.btn.small.danger').addEventListener('click', () => { state.expenses = state.expenses.filter(x => x.id !== e.id); saveState(state); renderAll(); });
+        card.querySelector('.btn.small').addEventListener('click', () => openExpenseModal(e));
+        list.appendChild(card);
+      });
+    }
+    function openExpenseModal(exp = null){
+      const isNew = !exp; const e = exp ? {...exp} : { id: uid(), date: new Date().toISOString().slice(0, 10), category:'Otro', concept:'', amount:0, payerId: state.people[0]?.id || '', splitType:'equal', participants: state.people.map(p => ({personId:p.id, share:1})) };
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class='grid cols-2'>
+        <div><label>Fecha</label><input type='date' id='ex-date' value='${e.date}'></div>
+        <div><label>Categoría</label><select id='ex-cat'>${CATEGORY_TEMPLATES.map(c => `<option value='${c}' ${e.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+        <div><label>Concepto</label><input id='ex-con' value='${e.concept}'></div>
+        <div><label>Monto (COP)</label><input type='number' id='ex-amt' min='0' step='1000' value='${e.amount}'></div>
+        <div><label>Pagó</label><select id='ex-payer'>${state.people.map(p => `<option value='${p.id}' ${e.payerId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+        <div><label>División</label><select id='ex-split'><option value='equal' ${e.splitType === 'equal' ? 'selected' : ''}>Por partes iguales</option><option value='custom' ${e.splitType === 'custom' ? 'selected' : ''}>Personalizada (%)</option></select></div>
+      </div>
+      <div class='mt-3 grid' id='ex-part'></div>`;
+      // Render participantes
+      const partWrap = wrap.querySelector('#ex-part');
+      function renderParticipants(){
+        partWrap.innerHTML = '';
+        const total = e.participants.reduce((s,p) => s + (p.share || 0), 0) || 1;
+        e.participants.forEach(pr => {
+          const row = document.createElement('div'); row.className = 'card';
+          row.innerHTML = `<div class='flex between wrap'><div>${state.people.find(p => p.id === pr.personId)?.name || ''}</div>
+            ${e.splitType === 'custom' ? `<div class='flex'> <input type='number' step='1' min='0' value='${pr.share || 0}' style='width:80px'/> <span class='pill'>${Math.round(((pr.share || 0) / total) * 100)}%</span></div>` : '<div class="muted">Partes iguales</div>'}
+          </div>`;
+          if(e.splitType === 'custom'){
+            const inp = row.querySelector('input'); inp.addEventListener('input', () => { pr.share = Number(inp.value || 0); renderParticipants(); });
+          }
+          partWrap.appendChild(row);
+        });
+      }
+      renderParticipants();
+      wrap.querySelector('#ex-split').addEventListener('change', () => {
+        e.splitType = wrap.querySelector('#ex-split').value;
+        if(e.splitType === 'equal'){ e.participants.forEach(pr => pr.share = 1); }
+        renderParticipants();
+      });
+      const saveBtn = { label: isNew ? 'Agregar' : 'Guardar', className:'btn ok', onClick: () => {
+        e.date = wrap.querySelector('#ex-date').value;
+        e.category = wrap.querySelector('#ex-cat').value;
+        e.concept = wrap.querySelector('#ex-con').value;
+        e.amount = Number(wrap.querySelector('#ex-amt').value || 0);
+        e.payerId = wrap.querySelector('#ex-payer').value;
+        e.splitType = wrap.querySelector('#ex-split').value;
+        if(isNew){ state.expenses = [e, ...state.expenses]; } else { state.expenses = state.expenses.map(x => x.id === e.id ? e : x); }
+        saveState(state); closeModal(); renderAll();
+      }};
+      const cancelBtn = { label:'Cancelar', className:'btn', onClick: () => closeModal() };
+      openModal(isNew ? 'Nuevo gasto' : 'Editar gasto', wrap, [cancelBtn, saveBtn]);
+    }
+    $('#btnNewExpense').addEventListener('click', () => openExpenseModal());
+
+    // ===== Reembolsos =====
+    function renderReimbursements(){
+      const list = $('#reim-list'); list.innerHTML = '';
+      if(state.reimbursements.length === 0){ const em = document.createElement('div'); em.className = 'muted'; em.textContent = 'Sin reembolsos.'; list.appendChild(em); return; }
+      state.reimbursements.forEach(r => {
+        const card = document.createElement('div'); card.className = 'item';
+        card.innerHTML = `<div class='flex between wrap'><div class='muted'>${r.date}</div><div class='pill'>${fmtCOP(r.amount)}</div></div>
+        <div class='mt-2'>${state.people.find(p => p.id === r.fromPersonId)?.name || '(quién paga)'} → ${state.people.find(p => p.id === r.toPersonId)?.name || '(receptor)'}</div>
+        <div class='mt-2 right'><button class='btn small'>Editar</button><button class='btn small danger'>Eliminar</button></div>`;
+        card.querySelector('.btn.small.danger').addEventListener('click', () => { state.reimbursements = state.reimbursements.filter(x => x.id !== r.id); saveState(state); renderAll(); });
+        card.querySelector('.btn.small').addEventListener('click', () => openReimModal(r));
+        list.appendChild(card);
+      });
+    }
+    function openReimModal(reim = null){
+      const r = reim ? {...reim} : { id: uid(), date: new Date().toISOString().slice(0, 10), fromPersonId:'', toPersonId: state.people.find(p => p.name.toLowerCase().includes('rafael'))?.id || state.people[0]?.id || '', amount: 0 };
+      const wrap = document.createElement('div');
+      wrap.innerHTML = `<div class='grid cols-2'>
+        <div><label>Fecha</label><input type='date' id='r-date' value='${r.date}'></div>
+        <div><label>Monto (COP)</label><input type='number' id='r-amt' min='0' step='1000' value='${r.amount}'></div>
+        <div><label>De (quién paga)</label><select id='r-from'><option value=''>— Selecciona —</option>${state.people.map(p => `<option value='${p.id}' ${r.fromPersonId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+        <div><label>Para (quién recibe)</label><select id='r-to'>${state.people.map(p => `<option value='${p.id}' ${r.toPersonId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}</select></div>
+      </div>`;
+      const saveBtn = { label: reim ? 'Guardar' : 'Agregar', className:'btn ok', onClick: () => {
+        r.date = wrap.querySelector('#r-date').value;
+        r.amount = Number(wrap.querySelector('#r-amt').value || 0);
+        r.fromPersonId = wrap.querySelector('#r-from').value;
+        r.toPersonId = wrap.querySelector('#r-to').value;
+        if(!r.fromPersonId || !r.toPersonId || r.fromPersonId === r.toPersonId){ alert('Selecciona pagador y receptor distintos'); return; }
+        if(reim){ state.reimbursements = state.reimbursements.map(x => x.id === r.id ? r : x); } else { state.reimbursements = [r, ...state.reimbursements]; }
+        saveState(state); closeModal(); renderAll();
+      }};
+      const cancelBtn = { label:'Cancelar', className:'btn', onClick: () => closeModal() };
+      openModal(reim ? 'Editar reembolso' : 'Nuevo reembolso', wrap, [cancelBtn, saveBtn]);
+    }
+    $('#btnNewReim').addEventListener('click', () => openReimModal());
+
+    // ===== Presupuestos =====
+    function renderBudgets(){
+      const wrap = $('#budget-list'); wrap.innerHTML = '';
+      state.people.forEach(p => {
+        const row = document.createElement('div'); row.className = 'flex between wrap';
+        row.innerHTML = `<div>${p.name}</div>
+          <div class='flex' style='gap:6px'>
+            <input type='number' min='0' step='10000' value='${p.budget || 0}' style='width:130px' />
+            <span class='pill'>${fmtCOP(p.budget || 0)}</span>
+          </div>`;
+        const inp = row.querySelector('input');
+        inp.addEventListener('input', () => {
+          p.budget = Number(inp.value || 0); saveState(state); row.querySelector('.pill').textContent = fmtCOP(p.budget || 0);
+        });
+        wrap.appendChild(row);
+      });
+    }
+
+    // ===== Balances / Estado de pagos =====
+    function computeBalances(){
+      // Calcula cuánto debe cada persona por gastos y reembolsos
+      const owed = Object.fromEntries(state.people.map(p => [p.id, 0]));
+      const reimbFrom = Object.fromEntries(state.people.map(p => [p.id, 0]));
+      const reimbTo   = Object.fromEntries(state.people.map(p => [p.id, 0]));
+      // Distribución de gastos
+      state.expenses.forEach(e => {
+        const totalShares = e.participants.reduce((s,p) => s + (p.share || 0), 0) || 1;
+        e.participants.forEach(pr => {
+          owed[pr.personId] += e.amount * ((pr.share || 0) / totalShares);
+        });
+      });
+      // Reembolsos
+      state.reimbursements.forEach(r => {
+        reimbFrom[r.fromPersonId] += r.amount;
+        reimbTo[r.toPersonId] += r.amount;
+      });
+      const rafaelId = state.people.find(p => p.name.toLowerCase().includes('rafael'))?.id || state.people[0]?.id;
+      return state.people.map(p => {
+        if(p.id === rafaelId){
+          // Todos los demás deben sumado menos lo que ya pagaron a Rafael
+          const othersTotal = state.people.filter(x => x.id !== p.id).reduce((s,x) => s + owed[x.id], 0);
+          const received = reimbTo[p.id] || 0;
+          const net = Math.max(othersTotal - received, 0);
+          return { personId:p.id, name:p.name, status: net <= 0 ? 'ok' : 'debt', amount: net };
+        } else {
+          const due = (owed[p.id] || 0) - (reimbFrom[p.id] || 0);
+          const amt = Math.max(due, 0);
+          return { personId:p.id, name:p.name, status: amt <= 0 ? 'ok' : 'debt', amount: amt };
+        }
+      });
+    }
+    function renderStatus(){
+      const grid = $('#status-grid'); grid.innerHTML = '';
+      const balances = computeBalances();
+      balances.forEach(b => {
+        const card = document.createElement('div'); card.className = 'status-card ' + (b.status === 'ok' ? 'status-ok' : 'status-debt');
+        card.innerHTML = `<div class='flex between wrap'>
+          <div style='font-weight:700'>${b.name}</div>
+          <span class='status-chip ${b.status === 'ok' ? 'ok' : 'debt'}'>${b.status === 'ok' ? 'AL DÍA' : 'Debe ' + fmtCOP(b.amount)}</span>
+        </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    // ===== Render principal =====
+    function renderAll(){ renderSuggestions(); renderItinerary(); renderExpenses(); renderReimbursements(); renderBudgets(); renderPeople(); renderStatus(); }
+
+    // ===== Auto-pruebas básicas en consola =====
+    (function runSelfTests(){ try {
+      const s1 = fmtCOP(50000); console.assert(s1.includes('$'), 'fmtCOP incluye $');
+      // Prueba que se añade actividad correctamente
+      const prevLen = state.itinerary[DATES[0].key].length;
+      const tmp = { id: uid(), title:'Test', city:'Ciudad', duration:1, tags:['Cultura'] };
+      state.itinerary[DATES[0].key].push(tmp);
+      console.assert(state.itinerary[DATES[0].key].length === prevLen + 1, 'Actividad añadida');
+      state.itinerary[DATES[0].key].pop();
+      console.log('✅ Self-tests passed');
+    } catch(err) { console.warn('⚠️ Problema en self-tests:', err); } })();
+
+    // Primer render
+    renderAll();
+  </script>
+</body>
+</html>

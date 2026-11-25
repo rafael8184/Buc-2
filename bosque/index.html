@@ -1,0 +1,1945 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bosque · Enfoque</title>
+<meta name="description" content="Temporizador Pomodoro con bosque persistente y modo estricto anti-distracción.">
+
+<!-- PWA / Standalone en iOS, iPadOS y macOS -->
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bosque">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#F4EFE3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111714" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+
+<style>
+/* =========================================================================
+   1. TOKENS DE DISEÑO (claro / oscuro automático / oscuro manual)
+   ========================================================================= */
+:root{
+  --bg:#F4EFE3; --bg2:#ECE5D4; --surface:#FFFCF5; --surface2:#F7F2E6; --line:#E3DAC7;
+  --ink:#26332A; --ink2:#55624F; --muted:#8A927F;
+  --accent:#4F7A55; --accent-ink:#FFFFFF; --accent-soft:#DFE8D5;
+  --break:#4F87A0; --danger:#D64545; --amber:#E39B2D; --gold:#C99520;
+  --soil:#9B7653; --grass1:#AFC98F; --grass2:#A2BF82; --dirt1:#8F6B4A; --dirt2:#76573B;
+  --ring-track:#E6DFCF;
+  --shadow:0 1px 2px rgba(38,51,42,.05),0 10px 30px rgba(38,51,42,.07);
+  --radius:20px; --nav-h:62px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111714; --bg2:#0C110E; --surface:#19221E; --surface2:#202A25; --line:#2B3731;
+    --ink:#E4ECE2; --ink2:#B5C2B3; --muted:#7F8D84;
+    --accent:#7DB487; --accent-ink:#0E1A12; --accent-soft:#233528;
+    --break:#7FB2C6; --danger:#F06A6A; --amber:#F0B04A; --gold:#E7BE4C;
+    --soil:#6E5640; --grass1:#3F5F40; --grass2:#38573A; --dirt1:#4A3828; --dirt2:#3B2C1F;
+    --ring-track:#26312B;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.3);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111714; --bg2:#0C110E; --surface:#19221E; --surface2:#202A25; --line:#2B3731;
+  --ink:#E4ECE2; --ink2:#B5C2B3; --muted:#7F8D84;
+  --accent:#7DB487; --accent-ink:#0E1A12; --accent-soft:#233528;
+  --break:#7FB2C6; --danger:#F06A6A; --amber:#F0B04A; --gold:#E7BE4C;
+  --soil:#6E5640; --grass1:#3F5F40; --grass2:#38573A; --dirt1:#4A3828; --dirt2:#3B2C1F;
+  --ring-track:#26312B;
+  --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.3);
+  color-scheme:dark;
+}
+
+/* =========================================================================
+   2. BASE
+   ========================================================================= */
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font:16px/1.45 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,"Segoe UI",Roboto,sans-serif;
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  -webkit-text-size-adjust:100%; overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;-webkit-user-select:none;user-select:none}
+button:disabled{cursor:default;opacity:.45}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{margin:0;font-weight:650;letter-spacing:-.01em}
+h1{font-size:28px}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-bottom:12px}
+[hidden]{display:none!important}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.num{font-variant-numeric:tabular-nums}
+
+/* =========================================================================
+   3. NAVEGACIÓN (barra inferior móvil / lateral escritorio)
+   ========================================================================= */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;
+  height:calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding:0 max(8px,env(safe-area-inset-left)) env(safe-area-inset-bottom) max(8px,env(safe-area-inset-right));
+  background:color-mix(in srgb,var(--surface) 84%,transparent);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);
+  border-top:1px solid var(--line);
+}
+.nav-brand{display:none}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  background:none;border:0;color:var(--muted);font-size:11px;font-weight:600;
+}
+.nav-btn svg{width:24px;height:24px}
+.nav-btn[aria-current="page"]{color:var(--accent)}
+body.is-running .nav-btn:not([aria-current="page"]){opacity:.55}
+
+main{
+  min-width:0;
+  padding:calc(env(safe-area-inset-top) + 6px) max(16px,env(safe-area-inset-right)) calc(var(--nav-h) + env(safe-area-inset-bottom) + 28px) max(16px,env(safe-area-inset-left));
+}
+.topbar{display:flex;align-items:center;justify-content:space-between;height:48px;max-width:1120px;margin:0 auto}
+.brand-mini{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:-.01em}
+.brand-mini svg{width:26px;height:26px}
+.icon-btn{
+  width:40px;height:40px;border-radius:12px;border:0;background:transparent;display:grid;place-items:center;color:var(--ink2);
+}
+.icon-btn:hover{background:var(--surface2)}
+.icon-btn svg{width:22px;height:22px}
+
+@media (min-width:900px){
+  .nav{
+    top:0;right:auto;width:236px;height:auto;flex-direction:column;justify-content:flex-start;gap:4px;
+    padding:calc(env(safe-area-inset-top) + 22px) 14px 22px;border-top:0;border-right:1px solid var(--line);
+  }
+  .nav-brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:19px;padding:4px 12px 22px}
+  .nav-brand svg{width:30px;height:30px}
+  .nav-btn{flex:0;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;border-radius:12px;font-size:15px;width:100%}
+  .nav-btn:hover{background:var(--surface2)}
+  .nav-btn[aria-current="page"]{background:var(--accent-soft)}
+  main{margin-left:236px;padding:22px 40px 48px}
+  .brand-mini{visibility:hidden}
+}
+
+/* =========================================================================
+   4. COMPONENTES GENERALES
+   ========================================================================= */
+.view{display:none;max-width:1120px;margin:0 auto;animation:fadeIn .25s ease}
+.view.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:6px 0 18px}
+.view-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow)}
+.card + .card{margin-top:12px}
+
+.seg{display:flex;background:var(--bg2);border-radius:14px;padding:4px;gap:2px}
+.seg-btn{
+  flex:1;border:0;background:transparent;border-radius:10px;padding:8px 10px;font-size:14px;font-weight:600;color:var(--ink2);
+  display:flex;flex-direction:column;align-items:center;line-height:1.15;white-space:nowrap;transition:background .2s,color .2s;
+}
+.seg-btn small{font-size:11px;font-weight:500;color:var(--muted)}
+.seg-btn[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.seg.small .seg-btn{padding:6px 12px;font-size:13px}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;
+  padding:12px 20px;font-weight:650;font-size:16px;background:var(--surface2);color:var(--ink);transition:transform .12s,filter .2s;
+}
+.btn:active{transform:scale(.97)}
+.btn svg{width:20px;height:20px}
+.btn-primary{background:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{filter:brightness(1.05)}
+.btn-danger{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+.btn-ghost{background:transparent;border:1px solid var(--line)}
+.btn-lg{padding:16px 34px;font-size:17px;border-radius:18px;min-width:220px}
+.btn-block{width:100%}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface2);
+  border-radius:999px;padding:7px 13px;font-size:14px;font-weight:550;color:var(--ink2);
+}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none;display:inline-block}
+
+.switch{position:relative;width:51px;height:31px;flex:none}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.switch span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:background .2s}
+.switch span::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .22s cubic-bezier(.3,.7,.4,1.2)}
+.switch input:checked + span{background:var(--accent)}
+.switch input:checked + span::after{transform:translateX(20px)}
+
+.row-card{display:flex;align-items:center;gap:14px}
+.row-card .grow{flex:1;min-width:0}
+.row-card .title{font-weight:600}
+.row-card .desc{font-size:13px;color:var(--muted)}
+
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:6px;background:var(--bg2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--surface);border:2px solid var(--accent);margin-top:-9px;box-shadow:0 2px 6px rgba(0,0,0,.18)}
+input[type=range]::-moz-range-track{height:6px;border-radius:6px;background:var(--bg2)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
+
+.field{
+  width:100%;border:1px solid var(--line);background:var(--surface2);border-radius:12px;padding:11px 13px;font-size:16px;outline:none;
+}
+.field:focus{border-color:var(--accent)}
+select.field{appearance:none;-webkit-appearance:none;padding-right:30px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 8l5 5 5-5' fill='none' stroke='%238A927F' stroke-width='2'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;background-size:16px}
+
+/* =========================================================================
+   5. VISTA ENFOQUE
+   ========================================================================= */
+.focus-grid{display:grid;gap:20px}
+@media (min-width:1040px){.focus-grid{grid-template-columns:minmax(0,1.1fr) minmax(320px,.9fr);align-items:start}}
+.focus-stage{display:flex;flex-direction:column;align-items:center;gap:14px;padding-top:4px}
+.focus-stage .seg{width:100%;max-width:460px}
+
+.ring-wrap{position:relative;width:min(78vw,330px);aspect-ratio:1;margin-top:6px}
+.ring{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:9}
+.ring-track{stroke:var(--ring-track)}
+.ring-prog{stroke:var(--accent);stroke-linecap:round;transition:stroke .4s,stroke-dashoffset .3s linear}
+body.is-break .ring-prog{stroke:var(--break)}
+body.is-danger .ring-prog{stroke:var(--danger)}
+.ring-inner{position:absolute;inset:11%;border-radius:50%;background:radial-gradient(circle at 50% 38%,var(--surface) 0%,var(--surface2) 72%);display:grid;place-items:center;overflow:hidden;box-shadow:inset 0 -6px 18px rgba(0,0,0,.04)}
+.plant{width:84%;height:84%;display:grid;place-items:end center}
+.plant svg{width:100%;height:100%;overflow:visible}
+.time{font:600 clamp(52px,14vw,72px)/1 ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sub{color:var(--ink2);font-size:15px;text-align:center;min-height:22px}
+.pills{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--surface2);color:var(--ink2);border:1px solid var(--line);max-width:100%}
+.pill.ok{color:var(--accent);background:var(--accent-soft);border-color:transparent}
+.pill.warn{color:var(--amber);background:color-mix(in srgb,var(--amber) 14%,transparent);border-color:transparent}
+.pill .clip{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:6px}
+
+.focus-side .card h3{display:flex;justify-content:space-between;align-items:center}
+body.is-running .setup-only{display:none}
+.slider-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px}
+.slider-row + .slider-row{margin-top:6px}
+.slider-row label{font-size:14px;color:var(--ink2);width:72px}
+.slider-row output{font-weight:650;width:62px;text-align:right}
+.reward-note{margin-top:10px;font-size:13px;color:var(--muted)}
+
+.species-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;margin:0 -4px;padding-left:4px;padding-right:4px}
+.species-row::-webkit-scrollbar{display:none}
+.sp-chip{flex:none;width:84px;border:1px solid var(--line);border-radius:16px;background:var(--surface2);padding:8px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px;font-weight:600;color:var(--ink2);position:relative}
+.sp-chip svg{width:50px;height:50px}
+.sp-chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.sp-chip.locked svg{filter:grayscale(1);opacity:.35}
+.sp-chip .lock{position:absolute;top:6px;right:7px;font-size:10px;color:var(--muted);font-weight:700}
+
+.task-pick{width:100%;text-align:left;border:0;background:none;padding:0}
+.task-pick .chev{color:var(--muted)}
+.vol{display:flex;align-items:center;gap:10px;margin-top:12px;color:var(--muted)}
+.vol svg{width:18px;height:18px;flex:none}
+
+/* Flash visual al regresar tras una distracción breve */
+body.flash-warn::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;box-shadow:inset 0 0 0 9999px color-mix(in srgb,var(--amber) 0%,transparent);animation:flashWarn 1.4s ease}
+@keyframes flashWarn{0%,40%{box-shadow:inset 0 0 120px 30px var(--danger)}20%,60%{box-shadow:inset 0 0 120px 30px var(--amber)}100%{box-shadow:inset 0 0 0 0 transparent}}
+
+/* =========================================================================
+   6. ALERTA DE DISTRACCIÓN (pantalla parpadeante)
+   ========================================================================= */
+.danger{
+  position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:24px;text-align:center;color:#fff;animation:dangerFlash .7s steps(1) infinite;
+}
+@keyframes dangerFlash{0%{background:#C62828}50%{background:#E08A1E}}
+.danger .count{font:700 110px/1 ui-rounded,-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.danger p{margin:0;font-size:18px;max-width:340px;font-weight:600}
+.danger .btn{background:#fff;color:#B71C1C;margin-top:12px}
+
+/* =========================================================================
+   7. VISTA BOSQUE
+   ========================================================================= */
+.forest-card{padding:0;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--break) 10%,var(--surface)) 0%,var(--surface) 60%)}
+.forest-caption{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px 0;font-size:14px;color:var(--ink2);flex-wrap:wrap}
+.forest-scroll{overflow:auto;-webkit-overflow-scrolling:touch;padding:4px 6px 12px}
+.forest-scroll svg{display:block;margin:0 auto;height:auto}
+.forest-empty{padding:40px 20px 48px;text-align:center;color:var(--muted)}
+.forest-empty svg{width:90px;height:90px;opacity:.8}
+.tree-hit{cursor:pointer}
+.tree-hit:hover .tree-shadow{fill:rgba(0,0,0,.25)}
+.pop{animation:popIn .9s cubic-bezier(.2,.9,.3,1.4) both;transform-box:fill-box;transform-origin:50% 100%}
+@keyframes popIn{from{transform:scale(0)}to{transform:scale(1)}}
+
+.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+@media (min-width:700px){.stats-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.stat{margin:0!important}
+.stat .label{font-size:12.5px;color:var(--muted);font-weight:600}
+.stat .value{font:650 30px/1.15 ui-rounded,-apple-system,system-ui,sans-serif;font-variant-numeric:tabular-nums;margin-top:4px}
+.stat .hint{font-size:12.5px;color:var(--ink2);margin-top:2px}
+.two-col{display:grid;gap:12px;margin-top:12px}
+.two-col .card{margin:0}
+@media (min-width:760px){.two-col{grid-template-columns:1fr 1fr}}
+.bar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;align-items:center;font-size:14px}
+.bar-row + .bar-row{margin-top:12px}
+.bar-row .name{display:flex;align-items:center;gap:8px;min-width:0}
+.bar-row .name span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-row .amt{color:var(--muted);font-variant-numeric:tabular-nums;font-size:13px}
+.bar{grid-column:1/-1;height:8px;border-radius:8px;background:var(--bg2);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:8px}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;align-items:end;height:150px}
+.week .col{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.week .b{width:100%;max-width:30px;border-radius:7px 7px 3px 3px;background:var(--accent);min-height:3px;transition:height .5s}
+.week .b.zero{background:var(--bg2)}
+.week .d{font-size:11.5px;color:var(--muted);font-weight:600}
+.week .v{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums;min-height:14px}
+.muted{color:var(--muted)}
+.empty-note{color:var(--muted);font-size:14px}
+
+.catalog{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:10px}
+.cat-item{background:var(--surface2);border-radius:16px;padding:10px 8px;text-align:center;font-size:12.5px;border:1px solid var(--line)}
+.cat-item svg{width:62px;height:62px}
+.cat-item .n{font-weight:650;color:var(--ink)}
+.cat-item .k{color:var(--muted);font-size:11.5px}
+.cat-item.locked svg{filter:grayscale(1) brightness(.6);opacity:.35}
+.progress-next{margin-bottom:14px;font-size:14px;color:var(--ink2)}
+.progress-next .bar{margin-top:8px}
+
+/* =========================================================================
+   8. VISTA TAREAS
+   ========================================================================= */
+.add-task{display:grid;gap:10px}
+.add-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.add-row select{flex:1;min-width:130px}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--surface2);overflow:hidden}
+.stepper button{border:0;background:none;width:38px;height:42px;font-size:20px;color:var(--ink2)}
+.stepper output{min-width:52px;text-align:center;font-weight:650;font-variant-numeric:tabular-nums}
+.task-list{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:8px}
+.task{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 12px 12px 14px;box-shadow:var(--shadow);position:relative;transition:transform .35s,opacity .35s}
+.task.is-active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.check{width:28px;height:28px;border-radius:50%;border:2px solid var(--muted);background:none;flex:none;display:grid;place-items:center;padding:0;transition:background .25s,border-color .25s,transform .25s}
+.check svg{width:16px;height:16px;stroke:var(--accent-ink);opacity:0;transform:scale(.3);transition:all .25s}
+.task.completing .check,.task.done .check{background:var(--accent);border-color:var(--accent);transform:scale(1.12)}
+.task.completing .check svg,.task.done .check svg{opacity:1;transform:scale(1)}
+.task.completing{opacity:.0;transform:translateX(24px);transition-delay:.35s}
+.task.done .task-title{text-decoration:line-through;color:var(--muted)}
+.task-main{flex:1;min-width:0;border:0;background:none;text-align:left;padding:0}
+.task-title{font-weight:600;overflow-wrap:anywhere}
+.task-meta{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-top:2px;flex-wrap:wrap}
+.task-meta .pomo{font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:600}
+.task-bar{height:4px;border-radius:4px;background:var(--bg2);margin-top:7px;overflow:hidden;max-width:220px}
+.task-bar i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.focus-btn{border:0;border-radius:10px;padding:7px 11px;font-size:13px;font-weight:650;background:var(--accent-soft);color:var(--accent);flex:none}
+.task.is-active .focus-btn{background:var(--accent);color:var(--accent-ink)}
+details.done-list{margin-top:18px}
+details.done-list summary{cursor:pointer;color:var(--ink2);font-weight:600;font-size:14px;list-style:none;display:flex;gap:6px;align-items:center}
+details.done-list summary::-webkit-details-marker{display:none}
+details.done-list summary::before{content:"›";display:inline-block;transition:transform .2s;font-size:18px}
+details.done-list[open] summary::before{transform:rotate(90deg)}
+.tag-list{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:6px}
+.tag-list li{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--line)}
+.tag-list li:last-child{border-bottom:0}
+.tag-list .grow{flex:1}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatch{width:28px;height:28px;border-radius:50%;border:3px solid transparent;padding:0}
+.swatch[aria-pressed="true"]{border-color:var(--ink)}
+.leaf-burst{position:fixed;pointer-events:none;z-index:90;width:12px;height:12px;border-radius:0 70% 0 70%;background:var(--accent);animation:burst .9s ease-out forwards}
+@keyframes burst{to{transform:translate(var(--dx),var(--dy)) rotate(var(--r));opacity:0}}
+
+/* =========================================================================
+   9. HOJAS MODALES Y TOASTS
+   ========================================================================= */
+.sheet-wrap{position:fixed;inset:0;z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.sheet-backdrop{position:absolute;inset:0;background:rgba(10,16,12,.42);opacity:0;transition:opacity .25s}
+.sheet{
+  position:relative;width:100%;max-width:520px;max-height:88dvh;overflow:auto;background:var(--surface);
+  border-radius:24px 24px 0 0;padding:10px 20px calc(22px + env(safe-area-inset-bottom));
+  transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:0 -10px 40px rgba(0,0,0,.2)
+}
+.sheet-wrap.open .sheet-backdrop{opacity:1}
+.sheet-wrap.open .sheet{transform:none}
+.sheet-grip{width:38px;height:5px;border-radius:5px;background:var(--line);margin:0 auto 14px}
+.sheet h2{font-size:22px;margin-bottom:6px}
+.sheet p{color:var(--ink2);margin:6px 0 0}
+.sheet .sheet-actions{display:grid;gap:10px;margin-top:20px}
+.sheet .section{margin-top:22px}
+.sheet .center{text-align:center}
+.sheet .hero-tree{width:150px;height:150px;margin:4px auto 0;display:block}
+.sheet-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:6px}
+.sheet-list button{width:100%;text-align:left;border:1px solid var(--line);background:var(--surface2);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:center}
+.sheet-list button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;margin-top:16px;font-size:15px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:550;overflow-wrap:anywhere}
+@media (min-width:700px){
+  .sheet-wrap{align-items:center}
+  .sheet{border-radius:24px;transform:translateY(24px) scale(.98);opacity:0;transition:transform .25s,opacity .25s}
+  .sheet-wrap.open .sheet{opacity:1}
+  .sheet-grip{display:none}
+  .sheet{padding-top:22px}
+}
+.toasts{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top) + 10px);z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;padding:0 16px}
+.toast{background:var(--ink);color:var(--bg);padding:11px 16px;border-radius:14px;font-size:14.5px;font-weight:600;box-shadow:0 8px 30px rgba(0,0,0,.25);max-width:440px;animation:toastIn .3s cubic-bezier(.2,.9,.3,1.2)}
+.toast.warn{background:var(--amber);color:#2a1a00}
+.toast.error{background:var(--danger);color:#fff}
+.toast.ok{background:var(--accent);color:var(--accent-ink)}
+.toast.out{animation:toastOut .25s forwards}
+@keyframes toastIn{from{opacity:0;transform:translateY(-14px) scale(.96)}}
+@keyframes toastOut{to{opacity:0;transform:translateY(-10px)}}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+
+<!-- Definiciones SVG compartidas (filtros y degradados usados por las especies) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="gWillow" cx="50%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#C9FFF3"/><stop offset=".6" stop-color="#6FD9C6"/><stop offset="1" stop-color="#3FA79A"/>
+    </radialGradient>
+    <radialGradient id="gGold" cx="45%" cy="35%" r="65%">
+      <stop offset="0" stop-color="#FFF1B0"/><stop offset=".55" stop-color="#F2C94C"/><stop offset="1" stop-color="#C9921E"/>
+    </radialGradient>
+  </defs>
+</svg>
+
+<div class="app">
+  <nav class="nav" aria-label="Navegación principal">
+    <div class="nav-brand"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--accent)"/><path d="M16 6l6 9h-3.5l4.5 6.5H9l4.5-6.5H10z" fill="var(--accent-ink)"/><rect x="15" y="21" width="2" height="5" rx="1" fill="var(--accent-ink)"/></svg>Bosque</div>
+    <button class="nav-btn" data-view="focus" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5M12 2.5V5"/></svg>Enfoque
+    </button>
+    <button class="nav-btn" data-view="forest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3l5 7h-3l4 6H2l4-6H3z"/><path d="M8 16v5M17 8a3.5 3.5 0 0 1 3.5 3.5c0 2-1.6 3.5-3.5 3.5s-3.5-1.5-3.5-3.5M17 15v6"/></svg>Mi Bosque
+    </button>
+    <button class="nav-btn" data-view="tasks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l1.5 1.5L8 5M4 12l1.5 1.5L8 11M4 18l1.5 1.5L8 17M11 6.5h9M11 12.5h9M11 18.5h9"/></svg>Tareas
+    </button>
+  </nav>
+
+  <main>
+    <header class="topbar">
+      <div class="brand-mini"><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--accent)"/><path d="M16 6l6 9h-3.5l4.5 6.5H9l4.5-6.5H10z" fill="var(--accent-ink)"/><rect x="15" y="21" width="2" height="5" rx="1" fill="var(--accent-ink)"/></svg>Bosque</div>
+      <button class="icon-btn" id="settingsBtn" aria-label="Ajustes y respaldo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </header>
+
+    <!-- ===================== VISTA: ENFOQUE ===================== -->
+    <section class="view active" id="view-focus" aria-label="Enfoque">
+      <div class="focus-grid">
+        <div class="focus-stage">
+          <div class="seg setup-only" id="modeSeg" role="group" aria-label="Modo de sesión">
+            <button class="seg-btn" data-mode="quick">Rápido<small>25 · 5</small></button>
+            <button class="seg-btn" data-mode="deep">Profundo<small>50 · 10</small></button>
+            <button class="seg-btn" data-mode="ultra">Ultra<small>90 · 15</small></button>
+            <button class="seg-btn" data-mode="custom">Personal<small id="customSmall">30 · 5</small></button>
+          </div>
+
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 300 300" aria-hidden="true">
+              <circle class="ring-track" cx="150" cy="150" r="140"/>
+              <circle class="ring-prog" id="ringProg" cx="150" cy="150" r="140"/>
+            </svg>
+            <div class="ring-inner"><div class="plant" id="plantView"></div></div>
+          </div>
+          <div class="time" id="timeText" role="timer" aria-live="off">25:00</div>
+          <div class="sub" id="subText"></div>
+          <div class="pills" id="statusPills"></div>
+          <div class="actions" id="actions"></div>
+        </div>
+
+        <div class="focus-side">
+          <div class="card setup-only" id="customCard">
+            <h3>Sesión personalizada</h3>
+            <div class="slider-row"><label for="cFocus">Enfoque</label><input type="range" id="cFocus" min="10" max="120" step="5"><output id="cFocusVal" class="num"></output></div>
+            <div class="slider-row"><label for="cBreak">Descanso</label><input type="range" id="cBreak" min="1" max="30" step="1"><output id="cBreakVal" class="num"></output></div>
+            <div class="reward-note" id="rewardNote"></div>
+          </div>
+          <div class="card setup-only">
+            <h3>Especie <span class="muted" id="catLabel" style="text-transform:none;letter-spacing:0"></span></h3>
+            <div class="species-row" id="speciesRow"></div>
+          </div>
+          <div class="card setup-only">
+            <h3>Etiqueta</h3>
+            <div class="chips" id="tagChips"></div>
+          </div>
+          <div class="card setup-only">
+            <button class="task-pick row-card" id="taskPick"></button>
+          </div>
+          <div class="card row-card setup-only">
+            <div class="grow">
+              <div class="title">Modo estricto</div>
+              <div class="desc">Si sales de la app más de 20 s, tu árbol se marchita.</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="strictToggle" aria-label="Modo estricto"><span></span></label>
+          </div>
+          <div class="card">
+            <h3>Sonido ambiental</h3>
+            <div class="chips" id="ambientChips">
+              <button class="chip" data-amb="none">Silencio</button>
+              <button class="chip" data-amb="rain">🌧 Lluvia</button>
+              <button class="chip" data-amb="white">〰 Ruido blanco</button>
+              <button class="chip" data-amb="wind">🍃 Viento</button>
+            </div>
+            <div class="vol">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+              <input type="range" id="volume" min="0" max="1" step="0.01" aria-label="Volumen">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== VISTA: MI BOSQUE ===================== -->
+    <section class="view" id="view-forest" aria-label="Mi Bosque">
+      <div class="view-head">
+        <div><h1>Mi Bosque</h1><p id="forestSubtitle"></p></div>
+        <div class="seg small" id="rangeSeg" role="group" aria-label="Periodo">
+          <button class="seg-btn" data-range="today">Hoy</button>
+          <button class="seg-btn" data-range="week">Semana</button>
+          <button class="seg-btn" data-range="month">Mes</button>
+          <button class="seg-btn" data-range="all">Todo</button>
+        </div>
+      </div>
+      <div class="card forest-card">
+        <div class="forest-caption" id="forestCaption"></div>
+        <div class="forest-scroll" id="forestScroll"></div>
+      </div>
+      <div class="stats-grid" id="statCards"></div>
+      <div class="two-col">
+        <div class="card"><h3>Tiempo por etiqueta</h3><div id="tagBars"></div></div>
+        <div class="card"><h3>Últimos 7 días</h3><div id="weekChart"></div></div>
+      </div>
+      <div class="card" style="margin-top:12px"><h3>Especies</h3><div id="nextUnlock"></div><div class="catalog" id="catalog"></div></div>
+    </section>
+
+    <!-- ===================== VISTA: TAREAS ===================== -->
+    <section class="view" id="view-tasks" aria-label="Tareas">
+      <div class="view-head"><div><h1>Tareas</h1><p>Elige una tarea y enfócate en ella. Cada pomodoro completado suma +1.</p></div></div>
+      <form class="card add-task" id="taskForm" autocomplete="off">
+        <input class="field" id="taskTitle" maxlength="140" placeholder="Nueva tarea…" aria-label="Título de la tarea">
+        <div class="add-row">
+          <div class="stepper" aria-label="Pomodoros estimados">
+            <button type="button" data-step="-1" aria-label="Menos">−</button>
+            <output id="taskEst" class="num">1 🍅</output>
+            <button type="button" data-step="1" aria-label="Más">+</button>
+          </div>
+          <select class="field" id="taskTag" aria-label="Etiqueta"></select>
+          <button class="btn btn-primary" type="submit">Añadir</button>
+        </div>
+      </form>
+      <ul class="task-list" id="taskList"></ul>
+      <details class="done-list" id="doneWrap"><summary id="doneSummary">Completadas</summary><ul class="task-list" id="doneList"></ul></details>
+
+      <div class="card" style="margin-top:24px">
+        <h3>Etiquetas y proyectos</h3>
+        <ul class="tag-list" id="tagList"></ul>
+        <form id="tagForm" class="add-task" autocomplete="off">
+          <input class="field" id="tagName" maxlength="32" placeholder="Nueva etiqueta (ej. Idiomas)" aria-label="Nombre de etiqueta">
+          <div class="add-row" style="justify-content:space-between">
+            <div class="swatches" id="tagSwatches"></div>
+            <button class="btn" type="submit">Crear</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Alerta de distracción -->
+<div class="danger" id="danger" hidden role="alertdialog" aria-live="assertive" aria-labelledby="dangerTitle">
+  <svg viewBox="0 0 24 24" width="54" height="54" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18v.01"/></svg>
+  <p id="dangerTitle">¡Vuelve! Tu árbol se marchitará en</p>
+  <div class="count" id="dangerCount">20</div>
+  <p style="font-weight:500;opacity:.9">Mantén la app abierta para que siga creciendo.</p>
+  <button class="btn" id="dangerBack">Estoy aquí, sigo enfocado</button>
+</div>
+
+<input type="file" id="importInput" accept=".json,application/json" hidden>
+<div id="sheetRoot"></div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* =============================================================================
+   BOSQUE · Pomodoro con bosque persistente y modo estricto
+   Arquitectura (vanilla ES2020, sin dependencias):
+     - Store   : persistencia en IndexedDB (fallback a localStorage)
+     - S       : estado en memoria (sesiones, tareas, etiquetas, ajustes)
+     - A       : sesión activa (temporizador) persistida de forma síncrona en
+                 localStorage para sobrevivir recargas/cierres de iOS
+     - SPECIES : catálogo botánico con ilustraciones SVG generadas en código
+     - Sound   : Web Audio API (ambientes, alarma, campanas)
+     - Wake    : Screen Wake Lock API
+   ============================================================================= */
+
+/* ---------- Utilidades ---------- */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const uid = (p = 'id') => `${p}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const pad = n => String(n).padStart(2, '0');
+const HEX = /^#[0-9a-f]{6}$/i;
+const safeColor = c => HEX.test(c) ? c : '#7A8B99';
+function fmtClock(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
+}
+function fmtDur(min) {
+  min = Math.round(min);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+const fmtHours = min => { const h = min / 60; return h < 10 ? h.toFixed(1).replace('.0', '') : Math.round(h).toString(); };
+function dayKey(t) { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+const fmtDate = t => new Date(t).toLocaleString('es', { weekday:'short', day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+/* ---------- Constantes de dominio ---------- */
+const GRACE_MS = 20000;            // ventana de regreso en modo estricto
+const CANCEL_FREE_MS = 10000;      // cancelar en los primeros 10 s no penaliza
+const ACTIVE_KEY = 'bosque-enfoque:active';
+const VIEW_KEY = 'bosque-enfoque:view';
+const MODES = {
+  quick:  { label:'Rápido',   focus:25, brk:5 },
+  deep:   { label:'Profundo', focus:50, brk:10 },
+  ultra:  { label:'Ultra',    focus:90, brk:15 },
+  custom: { label:'Personal' }
+};
+const CATS = {
+  plant:   { label:'Planta / Arbusto', short:'Planta',         size:54 },
+  tree:    { label:'Árbol grande',     short:'Árbol grande',   size:72 },
+  ancient: { label:'Árbol ancestral',  short:'Árbol ancestral',size:86 },
+  withered:{ label:'Árbol marchito',   short:'Marchito',       size:58 }
+};
+/** Regla: <40 min = Planta, 40–74 = Árbol grande, ≥75 = Ancestral */
+const catForMinutes = m => m < 40 ? 'plant' : m < 75 ? 'tree' : 'ancient';
+const TAG_COLORS = ['#5B8DEF','#E3A13B','#9B7BD4','#4F9A6A','#E06C75','#3FB5B0','#C98A5A','#7A8B99'];
+const DEFAULT_TAGS = () => [
+  { id:'tag-estudio',  name:'Estudio',           color:'#5B8DEF' },
+  { id:'tag-trabajo',  name:'Trabajo',           color:'#E3A13B' },
+  { id:'tag-lectura',  name:'Lectura',           color:'#9B7BD4' },
+  { id:'tag-personal', name:'Proyecto Personal', color:'#4F9A6A' }
+];
+const DEFAULT_SETTINGS = {
+  theme:'auto', mode:'quick', customFocus:30, customBreak:5, strict:true,
+  ambient:'none', volume:0.5, autoBreak:false, chime:true,
+  tagId:'tag-estudio', activeTaskId:null, forestRange:'week',
+  species:{ plant:'helecho', tree:'roble', ancient:'baobab' }, lastBackup:null
+};
+
+/* =============================================================================
+   ILUSTRACIONES BOTÁNICAS (SVG, viewBox 0 0 100 100, suelo en y=95)
+   draw(f, full): f = 0..1 cantidad de follaje; full = detalles finales
+   ============================================================================= */
+/** Agrupa el follaje para que crezca (escala + opacidad) desde un ancla */
+function canopy(f, cx, cy, inner) {
+  if (f <= 0) return '';
+  const k = 0.3 + 0.7 * f;
+  return `<g opacity="${Math.min(1, f * 1.6).toFixed(2)}" transform="translate(${cx} ${cy}) scale(${k.toFixed(3)}) translate(${-cx} ${-cy})">${inner}</g>`;
+}
+const circ = (cx, cy, r, c) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${c}"/>`;
+const star = (x, y, s, c) => `<path d="M${x} ${y - s}L${x + s * .28} ${y - s * .28}L${x + s} ${y}L${x + s * .28} ${y + s * .28}L${x} ${y + s}L${x - s * .28} ${y + s * .28}L${x - s} ${y}L${x - s * .28} ${y - s * .28}Z" fill="${c}"/>`;
+
+const SPECIES = {
+  /* ------------------------------ PLANTAS ------------------------------ */
+  helecho: { name:'Helecho', cat:'plant', unlock:0, leaf:'#5FA45C', stem:'#3F7A44',
+    draw(f) {
+      const fr = [
+        ['M50 92C40 80 26 70 12 66C26 63 42 73 50 92Z','#4A8A4B','M50 92C40 80 26 70 14 66'],
+        ['M50 92C60 80 74 70 88 66C74 63 58 73 50 92Z','#4A8A4B','M50 92C60 80 74 70 86 66'],
+        ['M50 92C42 74 34 56 24 42C40 49 49 70 50 92Z','#5BA058','M50 92C42 74 34 56 26 44'],
+        ['M50 92C58 74 66 56 76 42C60 49 51 70 50 92Z','#5BA058','M50 92C58 74 66 56 74 44'],
+        ['M50 92C46 70 47 48 50 28C54 48 54 70 50 92Z','#6DB566','M50 92C49 70 49 48 50 30']
+      ];
+      const leaves = fr.map(a => `<path d="${a[0]}" fill="${a[1]}"/>`).join('');
+      const ribs = `<g fill="none" stroke="#2C6236" stroke-width=".9" opacity=".55">${fr.map(a => `<path d="${a[2]}"/>`).join('')}</g>`;
+      return `<path d="M50 95V86" stroke="#3F7A44" stroke-width="3" stroke-linecap="round"/>` + canopy(f, 50, 90, leaves + ribs);
+    } },
+  lavanda: { name:'Lavanda', cat:'plant', unlock:1, leaf:'#7FA06A', stem:'#6E8F5E',
+    draw(f) {
+      const tops = [[-16, 46], [-8, 36], [0, 30], [8, 36], [16, 46]];
+      let stems = '', spikes = '';
+      tops.forEach(([dx, ty]) => {
+        stems += `<path d="M${50 + dx * .25} 94Q${50 + dx * .6} ${(94 + ty) / 2} ${50 + dx} ${ty + 12}" stroke="#6E8F5E" stroke-width="1.6" fill="none"/>`;
+        for (let i = 0; i < 5; i++) spikes += `<ellipse cx="${50 + dx}" cy="${ty + i * 3.2}" rx="${2.9 - i * .15}" ry="2.6" fill="${i % 2 ? '#9B7FD1' : '#B49AE6'}"/>`;
+      });
+      const blades = `<path d="M38 95Q40 82 36 74Q44 84 46 95ZM62 95Q60 82 64 74Q56 84 54 95ZM44 95Q46 84 50 78Q52 86 56 95Z" fill="#7FA06A"/>`;
+      return blades + stems + canopy(f, 50, 50, spikes);
+    } },
+  bonsai: { name:'Bonsái joven', cat:'plant', unlock:3, leaf:'#5E9A55', stem:'#6B4A33',
+    draw(f) {
+      const pot = `<path d="M30 85H70L65 95H35Z" fill="#B5683F"/><rect x="27" y="81" width="46" height="5" rx="2" fill="#CC7D4F"/>`;
+      const trunk = `<path d="M49 82C44 74 57 68 50 60C45 54 52 47 59 43" stroke="#6B4A33" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M50 62C43 60 37 58 32 55" stroke="#6B4A33" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+      const pads = `<ellipse cx="32" cy="52" rx="13" ry="6.5" fill="#4C8746"/><ellipse cx="60" cy="40" rx="17" ry="8" fill="#4C8746"/><ellipse cx="47" cy="31" rx="11" ry="6" fill="#5E9A55"/>
+        <ellipse cx="30" cy="50" rx="7" ry="3" fill="#74B068"/><ellipse cx="57" cy="37" rx="9" ry="3.5" fill="#74B068"/><ellipse cx="45" cy="29" rx="5" ry="2.5" fill="#86C178"/>`;
+      return pot + trunk + canopy(f, 50, 50, pads);
+    } },
+  /* ---------------------------- ÁRBOLES GRANDES ---------------------------- */
+  roble: { name:'Roble', cat:'tree', unlock:0, leaf:'#4F9150', stem:'#7B5B3E',
+    draw(f) {
+      const trunk = `<path d="M44 95C46 82 46 70 45 58H55C54 70 54 82 56 95Z" fill="#7B5B3E"/><path d="M50 95C51 82 51 70 50 58H55C54 70 54 82 56 95Z" fill="#664A32"/><path d="M47 66L37 54M53 64L63 52" stroke="#7B5B3E" stroke-width="3" stroke-linecap="round"/>`;
+      const c = circ(50, 40, 22, '#3E7A42') + circ(31, 50, 14, '#3E7A42') + circ(69, 50, 14, '#3E7A42') + circ(37, 30, 14, '#3E7A42') + circ(63, 30, 14, '#3E7A42') + circ(50, 22, 13, '#3E7A42')
+        + circ(46, 34, 14, '#4F9150') + circ(33, 46, 9, '#4F9150') + circ(60, 26, 9, '#4F9150') + circ(65, 46, 8, '#4F9150')
+        + circ(42, 26, 6, '#6BAA5E') + circ(55, 38, 5, '#6BAA5E') + circ(30, 44, 4, '#6BAA5E');
+      return trunk + canopy(f, 50, 56, c);
+    } },
+  pino: { name:'Pino', cat:'tree', unlock:0, leaf:'#2E6B4C', stem:'#5E4430',
+    draw(f) {
+      const trunk = `<rect x="46.5" y="70" width="7" height="25" rx="1.5" fill="#5E4430"/>`;
+      const t = `<path d="M50 8L67 36H33Z" fill="#2E6B4C"/><path d="M50 8L67 36H50Z" fill="#245A3F"/>
+        <path d="M50 22L73 56H27Z" fill="#33754F"/><path d="M50 22L73 56H50Z" fill="#285F42"/>
+        <path d="M50 38L79 78H21Z" fill="#3A7F55"/><path d="M50 38L79 78H50Z" fill="#2D6646"/>`;
+      return trunk + canopy(f, 50, 76, t);
+    } },
+  cerezo: { name:'Cerezo', cat:'tree', unlock:5, leaf:'#E994AC', stem:'#6A4A3A',
+    draw(f, full) {
+      const trunk = `<path d="M46 95C48 80 47 70 44 62L50 59L56 62C53 70 52 80 54 95Z" fill="#6A4A3A"/>
+        <path d="M46 64C40 58 34 54 28 50M54 64C60 58 66 54 72 50M50 60V44" stroke="#6A4A3A" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+      let c = circ(30, 46, 13, '#E58AA6') + circ(70, 46, 13, '#E58AA6') + circ(50, 34, 19, '#E58AA6') + circ(37, 29, 13, '#E58AA6') + circ(63, 29, 13, '#E58AA6')
+        + circ(44, 26, 9, '#F4B6C8') + circ(61, 38, 8, '#F4B6C8') + circ(29, 42, 7, '#F4B6C8') + circ(71, 42, 6, '#F4B6C8') + circ(52, 20, 6, '#F4B6C8');
+      [[38,36],[56,28],[66,44],[31,50],[47,42],[60,20],[42,22],[72,50],[25,44]].forEach(([x, y]) => c += circ(x, y, 1.6, '#FFF0F4'));
+      const petals = full ? `<g fill="#F4B6C8"><ellipse cx="22" cy="80" rx="2" ry="1.2" transform="rotate(30 22 80)"/><ellipse cx="78" cy="72" rx="2" ry="1.2" transform="rotate(-20 78 72)"/><ellipse cx="68" cy="90" rx="2" ry="1.2"/><ellipse cx="30" cy="92" rx="2" ry="1.2" transform="rotate(50 30 92)"/></g>` : '';
+      return trunk + canopy(f, 50, 56, c) + petals;
+    } },
+  arce: { name:'Arce Rojo', cat:'tree', unlock:15, leaf:'#D9562F', stem:'#6E4B35',
+    draw(f) {
+      const trunk = `<path d="M45 95C47 82 47 70 46 60H54C53 70 53 82 55 95Z" fill="#6E4B35"/><path d="M48 68L38 58M52 66L63 56M50 62V50" stroke="#6E4B35" stroke-width="2.6" stroke-linecap="round"/>`;
+      const c = circ(50, 38, 24, '#B83A2A') + circ(28, 48, 13, '#B83A2A') + circ(72, 48, 13, '#B83A2A') + circ(50, 18, 12, '#B83A2A')
+        + circ(43, 32, 15, '#D9562F') + circ(62, 42, 11, '#D9562F') + circ(32, 46, 8, '#D9562F') + circ(56, 22, 9, '#D9562F')
+        + circ(40, 26, 7, '#F08A3C') + circ(60, 36, 5, '#F08A3C') + circ(30, 42, 4, '#F5A85A') + circ(70, 50, 4, '#F08A3C');
+      return trunk + canopy(f, 50, 58, c);
+    } },
+  secuoya: { name:'Secuoya', cat:'tree', unlock:30, leaf:'#2D5E3E', stem:'#8C4B33',
+    draw(f) {
+      const trunk = `<path d="M45 95L48 16H52L55 95Z" fill="#8C4B33"/><path d="M50 95L50 16H52L55 95Z" fill="#743B27"/>`;
+      let c = '';
+      for (let i = 0; i < 8; i++) {
+        const y = 14 + i * 8.2, w = 6 + i * 3.1;
+        c += `<ellipse cx="50" cy="${y}" rx="${w}" ry="5.5" fill="${i % 2 ? '#2D5E3E' : '#3A7350'}"/>`;
+      }
+      c += `<ellipse cx="50" cy="8" rx="3" ry="5" fill="#3A7350"/>`;
+      return trunk + canopy(f, 50, 50, c);
+    } },
+  /* --------------------------- ÁRBOLES ANCESTRALES --------------------------- */
+  baobab: { name:'Baobab', cat:'ancient', unlock:0, leaf:'#6E9A4E', stem:'#A6845F',
+    draw(f) {
+      const trunk = `<path d="M37 95C32 78 38 58 44 46L46 33H54L56 46C62 58 68 78 63 95Z" fill="#A6845F"/>
+        <path d="M44 90C42 76 45 62 48 50M56 88C58 74 55 62 52 52" stroke="#8A6B4B" stroke-width="1.2" fill="none"/>
+        <path d="M46 35L33 24M54 35L69 22M50 33V20M47 34L40 18" stroke="#8F7050" stroke-width="3.2" stroke-linecap="round"/>`;
+      const c = `<ellipse cx="31" cy="22" rx="13" ry="5.5" fill="#5E8A42"/><ellipse cx="70" cy="20" rx="14" ry="5.5" fill="#5E8A42"/><ellipse cx="50" cy="16" rx="15" ry="6.5" fill="#6E9A4E"/><ellipse cx="40" cy="15" rx="9" ry="4.5" fill="#6E9A4E"/>
+        <ellipse cx="48" cy="14" rx="7" ry="2.4" fill="#8AB866"/><ellipse cx="68" cy="18" rx="6" ry="2" fill="#8AB866"/><ellipse cx="29" cy="20" rx="5" ry="2" fill="#8AB866"/>`;
+      return trunk + canopy(f, 50, 30, c);
+    } },
+  sauce: { name:'Sauce Luminoso', cat:'ancient', unlock:10, leaf:'#6FD9C6', stem:'#5A4A5E',
+    draw(f, full) {
+      const trunk = `<path d="M46 95C48 80 45 66 47 50H53C55 66 52 80 54 95Z" fill="#5A4A5E"/><path d="M48 58L38 46M52 56L62 44" stroke="#5A4A5E" stroke-width="2.4" stroke-linecap="round"/>`;
+      let strands = '';
+      for (let x = 26; x <= 74; x += 4) {
+        const len = 70 + Math.abs(50 - x) * -0.35 + ((x * 7) % 9);
+        strands += `<path d="M${x} 38Q${x + 3} ${(38 + len) / 2} ${x - 1} ${len}" stroke="#8FF0DD" stroke-width="1.5" fill="none" stroke-linecap="round" opacity=".9"/>`;
+      }
+      let glow = '';
+      if (full) [[34,60],[62,66],[48,72],[70,54],[28,50]].forEach(([x, y]) => glow += circ(x, y, 1.6, '#E9FFF9'));
+      const c = `<ellipse cx="50" cy="36" rx="27" ry="17" fill="url(#gWillow)"/><g filter="url(#glow)">${strands}${glow}</g>`;
+      return trunk + canopy(f, 50, 40, c);
+    } },
+  dorado: { name:'Árbol Dorado', cat:'ancient', unlock:25, leaf:'#EBC24A', stem:'#7A5A28',
+    draw(f, full) {
+      const trunk = `<path d="M44 95C46 82 46 70 45 58H55C54 70 54 82 56 95Z" fill="#7A5A28"/><path d="M51 95C52 82 52 70 51 58H55C54 70 54 82 56 95Z" fill="#634720"/><path d="M47 66L37 54M53 64L63 52" stroke="#7A5A28" stroke-width="3" stroke-linecap="round"/>`;
+      const c = circ(50, 38, 23, 'url(#gGold)') + circ(30, 50, 14, '#D9A52B') + circ(70, 50, 14, '#D9A52B') + circ(36, 28, 13, '#E6B53A') + circ(64, 28, 13, '#E6B53A')
+        + circ(45, 32, 11, '#F2CB55') + circ(58, 44, 8, '#F2CB55') + circ(42, 24, 5, '#FBE7A1') + circ(30, 46, 4, '#FBE7A1');
+      const sp = full ? `<g filter="url(#glow)">${star(22, 30, 4, '#FFF6CC')}${star(78, 36, 3.5, '#FFF6CC')}${star(60, 12, 3, '#FFFFFF')}${star(34, 70, 2.5, '#FFF6CC')}${star(72, 72, 2.5, '#FFFFFF')}</g>` : '';
+      return trunk + canopy(f, 50, 56, c) + sp;
+    } },
+  /* ------------------------------ MARCHITO ------------------------------ */
+  marchito: { name:'Tronco seco', cat:'withered', unlock:Infinity, leaf:'#8A7A5A', stem:'#7D6B5A',
+    draw() {
+      return `<path d="M28 95L38 92L42 95M58 95L64 91L72 95" stroke="#6E533A" stroke-width="1.2" fill="none"/>
+        <path d="M43 95L45 62L41 52L47 56L48 44L52 54L56 49L55 62L57 95Z" fill="#7D6B5A"/>
+        <path d="M50 95L50 56L52 54L56 49L55 62L57 95Z" fill="#655546"/>
+        <path d="M46 72L35 63L30 65M54 68L64 57L68 58M45 80L39 76" stroke="#7D6B5A" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M47 86L49 80L48 74M53 88L52 82" stroke="#4F4237" stroke-width=".9" fill="none"/>
+        <ellipse cx="34" cy="93" rx="2.4" ry="1.1" fill="#9B7A4E" transform="rotate(20 34 93)"/><ellipse cx="66" cy="94" rx="2.4" ry="1.1" fill="#8A6A40"/><ellipse cx="60" cy="92" rx="2" ry="1" fill="#A8885A" transform="rotate(-30 60 92)"/>`;
+    } }
+};
+const SPECIES_ORDER = ['helecho','lavanda','bonsai','roble','pino','cerezo','arce','secuoya','baobab','sauce','dorado'];
+
+/** SVG completo de una especie madura */
+const speciesSVG = (id, cls = '') => `<svg class="${cls}" viewBox="0 0 100 100" aria-hidden="true">${(SPECIES[id] || SPECIES.roble).draw(1, true)}</svg>`;
+
+/**
+ * Crecimiento en vivo según el % de la sesión:
+ * 0% semilla → 25% brote → 50% tallo/tronco → 75% follaje → 100% espécimen.
+ * La "cámara" (viewBox) se aleja suavemente a medida que la planta crece.
+ */
+function growthSVG(id, p) {
+  const sp = SPECIES[id] || SPECIES.roble;
+  p = clamp(p, 0, 1);
+  const vb = 48 + 52 * Math.min(1, p * 1.35);
+  const vx = 50 - vb / 2, vy = 100 - vb;
+  const mound = `<ellipse cx="50" cy="96" rx="27" ry="6" style="fill:var(--soil)"/><ellipse cx="50" cy="94.5" rx="20" ry="2.6" fill="#000" opacity=".08"/>`;
+  let body;
+  if (p < 0.25) {
+    const t = p / 0.25;
+    const wob = Math.sin(t * Math.PI * 6) * (t > .4 ? 4 : 0);
+    body = `<g transform="rotate(${wob.toFixed(1)} 50 90)"><ellipse cx="50" cy="88.5" rx="5" ry="3.6" fill="#8A5A36"/><ellipse cx="48.4" cy="87.4" rx="1.8" ry="1" fill="#C08A5E"/>
+      ${t > .55 ? '<path d="M48 86.2l2 2.2 2-2.2" stroke="#3B2A1C" stroke-width=".7" fill="none"/>' : ''}</g>
+      ${t > .78 ? `<path d="M50 86Q49.4 ${86 - (t - .78) * 26} 51 ${86 - (t - .78) * 36}" stroke="${sp.leaf}" stroke-width="1.5" fill="none" stroke-linecap="round"/>` : ''}`;
+  } else if (p < 0.5) {
+    const t = (p - 0.25) / 0.25, h = 8 + t * 20, top = 92 - h, ls = 3 + t * 5;
+    body = `<path d="M50 92Q48.5 ${92 - h / 2} 50 ${top}" stroke="${sp.stem === '#5A4A5E' ? '#6F8F62' : '#5D8A4C'}" stroke-width="${(1.5 + t).toFixed(2)}" fill="none" stroke-linecap="round"/>
+      <ellipse cx="${50 - ls}" cy="${top}" rx="${ls}" ry="${ls * .45}" transform="rotate(-24 ${50 - ls} ${top})" fill="${sp.leaf}"/>
+      <ellipse cx="${50 + ls}" cy="${top - 1}" rx="${ls}" ry="${ls * .45}" transform="rotate(24 ${50 + ls} ${top - 1})" fill="${sp.leaf}"/>`;
+  } else {
+    const t = (p - 0.5) / 0.5, s = 0.5 + 0.5 * t, f = t < 0.03 ? 0 : Math.min(1, t * 1.15);
+    body = `<g transform="translate(50 95) scale(${s.toFixed(3)}) translate(-50 -95)">${sp.draw(f, p >= 1)}</g>`;
+  }
+  return `<svg viewBox="${vx.toFixed(2)} ${vy.toFixed(2)} ${vb.toFixed(2)} ${vb.toFixed(2)}" aria-hidden="true">${mound}${body}</svg>`;
+}
+
+/* =============================================================================
+   PERSISTENCIA — IndexedDB con fallback a localStorage
+   ============================================================================= */
+const Store = (() => {
+  const NAME = 'bosque-enfoque', VER = 1, STORES = ['sessions', 'tasks', 'tags', 'meta'];
+  let db = null, useLS = false;
+  const lsKey = s => `${NAME}:${s}`;
+  const lsGet = s => { try { return JSON.parse(localStorage.getItem(lsKey(s)) || '[]'); } catch { return []; } };
+  const lsSet = (s, a) => { localStorage.setItem(lsKey(s), JSON.stringify(a)); };
+
+  function open() {
+    return new Promise(res => {
+      if (!('indexedDB' in window)) { useLS = true; return res(); }
+      let req;
+      try { req = indexedDB.open(NAME, VER); } catch { useLS = true; return res(); }
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        STORES.forEach(s => { if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath:'id' }); });
+      };
+      req.onsuccess = () => { db = req.result; db.onversionchange = () => db.close(); res(); };
+      req.onerror = () => { useLS = true; res(); };
+      setTimeout(() => { if (!db && !useLS) { useLS = true; res(); } }, 4000); // iOS a veces cuelga el open
+    });
+  }
+  function tx(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = db.transaction(store, mode), st = t.objectStore(store), r = fn(st);
+      t.oncomplete = () => res(r && 'result' in r ? r.result : undefined);
+      t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  }
+  return {
+    open,
+    get backend() { return useLS ? 'localStorage' : 'IndexedDB'; },
+    async all(s) { return useLS ? lsGet(s) : tx(s, 'readonly', st => st.getAll()); },
+    async putMany(s, arr) {
+      if (!arr.length) return;
+      if (useLS) { const m = new Map(lsGet(s).map(o => [o.id, o])); arr.forEach(o => m.set(o.id, o)); return lsSet(s, [...m.values()]); }
+      return tx(s, 'readwrite', st => { arr.forEach(o => st.put(o)); });
+    },
+    async put(s, obj) { return this.putMany(s, [obj]); },
+    async del(s, id) {
+      if (useLS) return lsSet(s, lsGet(s).filter(o => o.id !== id));
+      return tx(s, 'readwrite', st => st.delete(id));
+    },
+    async clear(s) { if (useLS) return lsSet(s, []); return tx(s, 'readwrite', st => st.clear()); }
+  };
+})();
+/** Envoltura que avisa si falla una escritura (p. ej. cuota llena) */
+function persist(promise) { return Promise.resolve(promise).catch(err => { console.error(err); toast('No se pudo guardar. Exporta un respaldo.', 'error', 5000); }); }
+
+/* ---------- Estado global ---------- */
+const S = { sessions:[], tasks:[], tags:[], settings:structuredCloneSafe(DEFAULT_SETTINGS), lastPlanted:null };
+let A = null; // sesión activa
+function structuredCloneSafe(o) { return JSON.parse(JSON.stringify(o)); }
+const saveSettings = () => persist(Store.put('meta', { id:'settings', value:S.settings }));
+function saveActive() { try { A ? localStorage.setItem(ACTIVE_KEY, JSON.stringify(A)) : localStorage.removeItem(ACTIVE_KEY); } catch {} }
+function loadActive() { try { A = JSON.parse(localStorage.getItem(ACTIVE_KEY) || 'null'); } catch { A = null; } }
+function mergeSettings(v) {
+  const base = structuredCloneSafe(DEFAULT_SETTINGS);
+  const out = Object.assign(base, v || {});
+  out.species = Object.assign({}, DEFAULT_SETTINGS.species, (v && v.species) || {});
+  out.customFocus = clamp(+out.customFocus || 30, 10, 120);
+  out.customBreak = clamp(+out.customBreak || 5, 1, 30);
+  out.volume = clamp(+out.volume, 0, 1);
+  if (!MODES[out.mode]) out.mode = 'quick';
+  return out;
+}
+
+/* ---------- Derivados ---------- */
+const tagById = id => S.tags.find(t => t.id === id);
+const taskById = id => S.tasks.find(t => t.id === id);
+const aliveMinutes = (list = S.sessions) => list.reduce((a, s) => a + (s.status === 'alive' ? (s.minutes || 0) : 0), 0);
+const totalHours = () => aliveMinutes() / 60;
+const isUnlocked = id => totalHours() >= SPECIES[id].unlock;
+function chosenSpecies(cat) {
+  const want = S.settings.species[cat];
+  if (want && SPECIES[want] && SPECIES[want].cat === cat && isUnlocked(want)) return want;
+  return SPECIES_ORDER.find(id => SPECIES[id].cat === cat && isUnlocked(id));
+}
+function currentConfig() {
+  const s = S.settings, m = MODES[s.mode];
+  const focus = s.mode === 'custom' ? s.customFocus : m.focus;
+  const brk = s.mode === 'custom' ? s.customBreak : m.brk;
+  return { focus, brk, cat:catForMinutes(focus) };
+}
+function rangeStart(r) {
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  if (r === 'today') return d.getTime();
+  if (r === 'week') { d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+  if (r === 'month') { d.setDate(1); return d.getTime(); }
+  return 0;
+}
+function streaks() {
+  const days = new Set(S.sessions.filter(s => s.status === 'alive').map(s => dayKey(s.end)));
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+  let current = 0;
+  while (days.has(dayKey(d))) { current++; d.setDate(d.getDate() - 1); }
+  const sorted = [...days].sort();
+  let best = 0, run = 0, prev = null;
+  for (const k of sorted) {
+    const t = new Date(k + 'T12:00:00').getTime();
+    run = prev !== null && Math.round((t - prev) / 864e5) === 1 ? run + 1 : 1;
+    best = Math.max(best, run); prev = t;
+  }
+  return { current, best };
+}
+
+/* =============================================================================
+   AUDIO — Web Audio API (sin archivos externos)
+   ============================================================================= */
+const Sound = (() => {
+  let ctx = null, master = null, amb = null, alarmTimer = null, previewTimer = null;
+  const buffers = {};
+  function ensure() {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    if (!ctx) { ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination); }
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
+    return ctx;
+  }
+  /** Genera 4 s de ruido estéreo: white | pink | brown */
+  function noise(type) {
+    if (buffers[type]) return buffers[type];
+    const len = ctx.sampleRate * 4, buf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const d = buf.getChannelData(ch);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
+      for (let i = 0; i < len; i++) {
+        const w = Math.random() * 2 - 1;
+        if (type === 'white') d[i] = w * 0.5;
+        else if (type === 'pink') {
+          b0 = .99886 * b0 + w * .0555179; b1 = .99332 * b1 + w * .0750759; b2 = .969 * b2 + w * .153852;
+          b3 = .8665 * b3 + w * .3104856; b4 = .55 * b4 + w * .5329522; b5 = -.7616 * b5 - w * .016898;
+          d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * .5362) * .11; b6 = w * .115926;
+        } else { last = (last + .02 * w) / 1.02; d[i] = last * 3.5; }
+      }
+    }
+    return (buffers[type] = buf);
+  }
+  function loop(type) { const s = ctx.createBufferSource(); s.buffer = noise(type); s.loop = true; s.start(); return s; }
+  function chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
+  function filter(type, freq, q = .7) { const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; return f; }
+  function gain(v) { const g = ctx.createGain(); g.gain.value = v; return g; }
+
+  function startAmbient(kind, vol) {
+    stopAmbient(true);
+    if (!kind || kind === 'none' || !ensure()) return;
+    const out = gain(0); out.connect(master);
+    out.gain.setTargetAtTime(vol, ctx.currentTime, .6);
+    const srcs = [], timers = [];
+    if (kind === 'white') {
+      srcs.push(loop('white'));
+      chain(srcs[0], filter('lowpass', 8000), gain(.55), out);
+    } else if (kind === 'rain') {
+      srcs.push(loop('pink'));
+      chain(srcs[0], filter('highpass', 350), filter('lowpass', 6500), gain(.9), out);
+      // gotas: ráfagas cortas filtradas a intervalos aleatorios
+      const drops = gain(.5); drops.connect(out);
+      timers.push(setInterval(() => {
+        if (!ctx || Math.random() > .55) return;
+        const s = ctx.createBufferSource(); s.buffer = noise('white');
+        const bp = filter('bandpass', 1800 + Math.random() * 4200, 6), g = gain(0), t = ctx.currentTime;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(.25 + Math.random() * .35, t + .004); g.gain.exponentialRampToValueAtTime(.0008, t + .06);
+        chain(s, bp, g, drops); s.start(t, Math.random() * 3, .08);
+      }, 45));
+    } else if (kind === 'wind') {
+      srcs.push(loop('brown'));
+      const bp = filter('bandpass', 420, .9), g = gain(.8);
+      chain(srcs[0], bp, g, out);
+      const lfo = ctx.createOscillator(), lg = gain(260); lfo.frequency.value = .07; chain(lfo, lg, bp.frequency); lfo.start();
+      const lfo2 = ctx.createOscillator(), lg2 = gain(.35); lfo2.frequency.value = .13; chain(lfo2, lg2, g.gain); lfo2.start();
+      srcs.push(lfo, lfo2);
+      // susurro de hojas
+      const leaves = loop('pink'); srcs.push(leaves);
+      const lgain = gain(.12); chain(leaves, filter('highpass', 2500), lgain, out);
+      const lfo3 = ctx.createOscillator(), lg3 = gain(.1); lfo3.frequency.value = .21; chain(lfo3, lg3, lgain.gain); lfo3.start(); srcs.push(lfo3);
+    }
+    amb = { out, srcs, timers, kind };
+  }
+  function stopAmbient(immediate) {
+    clearTimeout(previewTimer);
+    if (!amb || !ctx) return;
+    const a = amb; amb = null;
+    a.timers.forEach(clearInterval);
+    a.out.gain.setTargetAtTime(0, ctx.currentTime, immediate ? .03 : .25);
+    setTimeout(() => { a.srcs.forEach(s => { try { s.stop(); } catch {} }); a.out.disconnect(); }, immediate ? 150 : 1200);
+  }
+  function setVolume(v) { if (amb && ctx) amb.out.gain.setTargetAtTime(v, ctx.currentTime, .15); }
+  function preview(kind, vol) { startAmbient(kind, vol); clearTimeout(previewTimer); previewTimer = setTimeout(() => { if (!A) stopAmbient(); }, 3500); }
+  function tone(freq, start, dur, type = 'sine', vol = .25) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(vol, start + .015); g.gain.exponentialRampToValueAtTime(.0005, start + dur);
+    o.connect(g); g.connect(master); o.start(start); o.stop(start + dur + .05);
+  }
+  function chime() { if (!ensure()) return; const t = ctx.currentTime + .05; [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, t + i * .13, 1.4, 'triangle', .22)); }
+  function softBell() { if (!ensure()) return; const t = ctx.currentTime + .05; tone(880, t, 1.8, 'sine', .2); tone(1320, t + .02, 1.2, 'sine', .07); tone(660, t + .35, 1.8, 'sine', .16); }
+  function alarmStart() {
+    if (!ensure() || alarmTimer) return;
+    const beep = () => { if (!ctx) return; const t = ctx.currentTime; tone(988, t, .16, 'square', .16); tone(740, t + .2, .16, 'square', .16); tone(988, t + .4, .16, 'square', .16); };
+    beep(); alarmTimer = setInterval(beep, 900);
+  }
+  function alarmStop() { clearInterval(alarmTimer); alarmTimer = null; }
+  const playing = () => amb && amb.kind;
+  return { ensure, startAmbient, stopAmbient, setVolume, preview, chime, softBell, alarmStart, alarmStop, playing };
+})();
+
+/* =============================================================================
+   SCREEN WAKE LOCK — evita que la pantalla se apague durante la sesión
+   ============================================================================= */
+const Wake = {
+  lock:null, want:false,
+  get supported() { return 'wakeLock' in navigator; },
+  get active() { return !!(this.lock && !this.lock.released); },
+  async acquire() {
+    this.want = true;
+    if (!this.supported || document.hidden) return false;
+    if (this.active) return true;
+    try {
+      this.lock = await navigator.wakeLock.request('screen');
+      this.lock.addEventListener('release', () => { renderPills(); });
+      renderPills();
+      return true;
+    } catch { return false; }
+  },
+  async release() { this.want = false; try { if (this.lock) await this.lock.release(); } catch {} this.lock = null; renderPills(); }
+};
+
+/* =============================================================================
+   MOTOR DEL TEMPORIZADOR
+   ============================================================================= */
+function vibrate(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch {} }
+
+function startFocus() {
+  const cfg = currentConfig();
+  const species = chosenSpecies(cfg.cat);
+  Sound.ensure();                      // desbloquea audio en iOS (requiere gesto)
+  const now = Date.now();
+  const task = taskById(S.settings.activeTaskId);
+  A = {
+    id:uid('s'), phase:'focus', startAt:now, endAt:now + cfg.focus * 60000,
+    plannedMin:cfg.focus, breakMin:cfg.brk, cat:cfg.cat, species, mode:S.settings.mode,
+    tagId:S.settings.tagId, taskId:task && !task.done ? task.id : null, strict:S.settings.strict,
+    paused:false, remaining:null, awayAt:null, warnings:0
+  };
+  saveActive();
+  Wake.acquire();
+  Sound.startAmbient(S.settings.ambient, S.settings.volume);
+  renderFocus();
+}
+
+function startBreak(min, species) {
+  const now = Date.now();
+  A = { id:uid('b'), phase:'break', startAt:now, endAt:now + min * 60000, breakMin:min, species, strict:false, paused:false, awayAt:null };
+  saveActive();
+  Wake.acquire();
+  if (!Sound.playing() && S.settings.ambient !== 'none') Sound.startAmbient(S.settings.ambient, S.settings.volume);
+  renderFocus();
+}
+
+function endRunning() {
+  A = null; saveActive();
+  Wake.release(); Sound.stopAmbient(); Sound.alarmStop(); hideDanger();
+  document.title = 'Bosque · Enfoque';
+  renderFocus();
+}
+
+function pauseToggle() {
+  if (!A || A.strict) return;
+  if (A.paused) { A.endAt = Date.now() + A.remaining; A.paused = false; A.remaining = null; Wake.acquire(); }
+  else { A.remaining = A.endAt - Date.now(); A.paused = true; }
+  saveActive(); renderFocus();
+}
+
+/** Sesión completada: se planta el espécimen y suma +1 a la tarea */
+function completeFocus() {
+  const a = A; if (!a || a.phase !== 'focus') return;
+  const prevHours = totalHours();
+  const task = taskById(a.taskId);
+  const s = {
+    id:a.id, status:'alive', start:a.startAt, end:a.endAt, minutes:a.plannedMin, plannedMin:a.plannedMin,
+    cat:a.cat, species:a.species, tagId:a.tagId, taskId:a.taskId, taskTitle:task ? task.title : null,
+    mode:a.mode, strict:a.strict, warnings:a.warnings || 0
+  };
+  S.sessions.push(s); S.lastPlanted = s.id;
+  persist(Store.put('sessions', s));
+  if (task) { task.pomos = (task.pomos || 0) + 1; persist(Store.put('tasks', task)); }
+  hideDanger(); Sound.alarmStop();
+  if (S.settings.chime) Sound.chime();
+  vibrate([80, 60, 80]);
+
+  const newly = SPECIES_ORDER.filter(id => SPECIES[id].unlock > prevHours && SPECIES[id].unlock <= totalHours());
+  const autoBreak = S.settings.autoBreak;
+  if (autoBreak) startBreak(a.breakMin, a.species); else endRunning();
+  renderTasks(); renderForest();
+
+  const sp = SPECIES[s.species];
+  const sheet = openSheet(`
+    <div class="center">
+      ${speciesSVG(s.species, 'hero-tree')}
+      <h2>¡Plantaste ${esc(articleFor(s.species))} ${esc(sp.name)}!</h2>
+      <p>+${fmtDur(s.minutes)} de enfoque${task ? ` · ${esc(task.title)} <b class="num">${task.pomos}/${task.est} 🍅</b>` : ''}</p>
+      ${s.warnings ? `<p class="muted" style="font-size:14px">Sobreviviste a ${s.warnings} ${s.warnings === 1 ? 'distracción' : 'distracciones'}.</p>` : ''}
+    </div>
+    <div class="sheet-actions">
+      ${autoBreak ? `<button class="btn btn-primary btn-block" data-close>Disfrutar el descanso (${a.breakMin} min)</button>`
+        : `<button class="btn btn-primary btn-block" data-act="break">Iniciar descanso · ${a.breakMin} min</button>
+           <button class="btn btn-ghost btn-block" data-close>Saltar descanso</button>`}
+      <button class="btn btn-ghost btn-block" data-act="see">Ver mi bosque</button>
+    </div>`);
+  sheet.el.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    if (b.dataset.act === 'break') startBreak(a.breakMin, a.species);
+    if (b.dataset.act === 'see') showView('forest');
+    sheet.close();
+  });
+  newly.forEach((id, i) => setTimeout(() => toast(`🌱 ¡Nueva especie desbloqueada: ${SPECIES[id].name}!`, 'ok', 4500), 900 + i * 1200));
+}
+function articleFor(id) { return ['lavanda','secuoya'].includes(id) ? 'una' : 'un'; }
+
+function completeBreak() {
+  if (S.settings.chime) Sound.softBell();
+  vibrate([60, 40, 60]);
+  endRunning();
+  toast('☕ Descanso terminado. ¿Listo para plantar otro?', 'ok', 4500);
+}
+
+/** Sesión perdida: se planta un tronco seco */
+function wither(reason, at) {
+  const a = A; if (!a || a.phase !== 'focus') return;
+  const end = at || Date.now();
+  const task = taskById(a.taskId);
+  const s = {
+    id:a.id, status:'withered', start:a.startAt, end, minutes:0, plannedMin:a.plannedMin,
+    elapsedMin:Math.max(0, Math.round((end - a.startAt) / 60000)), cat:'withered', species:'marchito', intended:a.species,
+    tagId:a.tagId, taskId:a.taskId, taskTitle:task ? task.title : null, mode:a.mode, strict:a.strict, reason
+  };
+  S.sessions.push(s); S.lastPlanted = s.id;
+  persist(Store.put('sessions', s));
+  endRunning(); renderForest();
+  vibrate([400]);
+  const sheet = openSheet(`
+    <div class="center">
+      ${speciesSVG('marchito', 'hero-tree')}
+      <h2>Tu ${esc(SPECIES[a.species].name.toLowerCase())} se marchitó</h2>
+      <p>${reason === 'distraction' ? 'Saliste de la app durante más de 20 segundos. El progreso de esta sesión se perdió.' : 'Abandonaste la sesión antes de terminar.'}</p>
+      <p class="muted" style="font-size:14px">Un tronco seco quedará en tu bosque como recordatorio.</p>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn btn-primary btn-block" data-close>Intentarlo de nuevo</button>
+    </div>`);
+  return sheet;
+}
+
+/* ---------- Sistema anti-distracción (Page Visibility + blur/focus) ---------- */
+function onAway() {
+  if (!A || A.phase !== 'focus' || !A.strict || A.paused || A.awayAt) return;
+  A.awayAt = Date.now(); saveActive();
+  vibrate([300, 100, 300, 100, 500]);
+  Sound.alarmStart();
+  showDanger();
+}
+function onBack() {
+  if (!A || A.phase !== 'focus' || !A.awayAt || document.hidden) return;
+  const now = Date.now(), deadline = A.awayAt + GRACE_MS;
+  if (now >= A.endAt && A.endAt <= deadline) { completeFocus(); return; }
+  if (now >= deadline) { wither('distraction', deadline); return; }
+  A.awayAt = null; A.warnings = (A.warnings || 0) + 1; saveActive();
+  Sound.alarmStop(); hideDanger();
+  document.body.classList.remove('flash-warn'); void document.body.offsetWidth; document.body.classList.add('flash-warn');
+  setTimeout(() => document.body.classList.remove('flash-warn'), 1500);
+  toast('¡Casi pierdes tu árbol! Mantente enfocado', 'warn', 4000);
+  if (Wake.want) Wake.acquire();
+}
+let vibTimer = null;
+function showDanger() {
+  $('#danger').hidden = false; document.body.classList.add('is-danger');
+  clearInterval(vibTimer); vibTimer = setInterval(() => vibrate([300, 100, 300]), 2500);
+  updateDanger();
+}
+function hideDanger() { $('#danger').hidden = true; document.body.classList.remove('is-danger'); clearInterval(vibTimer); }
+function updateDanger() {
+  if (!A || !A.awayAt) return;
+  const left = Math.max(0, Math.ceil((GRACE_MS - (Date.now() - A.awayAt)) / 1000));
+  $('#dangerCount').textContent = left;
+  document.title = `⚠️ ${left}s · ¡Vuelve a Bosque!`;
+}
+
+/* ---------- Bucle principal ---------- */
+let lastPlantKey = '';
+function tick() {
+  if (!A) return;
+  const now = Date.now();
+  if (A.phase === 'focus' && A.awayAt) {
+    const deadline = A.awayAt + GRACE_MS;
+    if (now >= A.endAt && A.endAt <= deadline) return completeFocus();
+    if (now >= deadline) return wither('distraction', deadline);
+    updateDanger();
+  }
+  if (!A.paused && now >= A.endAt) return A.phase === 'focus' ? completeFocus() : completeBreak();
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const ring = $('#ringProg'), C = 2 * Math.PI * 140;
+  ring.style.strokeDasharray = C.toFixed(1);
+  let p, remaining, plantHTML, key;
+  if (!A) {
+    const cfg = currentConfig();
+    remaining = cfg.focus * 60000; p = 0;
+    const sp = chosenSpecies(cfg.cat);
+    key = 'idle-' + sp; plantHTML = () => growthSVG(sp, 0);
+  } else {
+    const total = (A.phase === 'focus' ? A.plannedMin : A.breakMin) * 60000;
+    remaining = A.paused ? A.remaining : A.endAt - Date.now();
+    p = clamp(1 - remaining / total, 0, 1);
+    if (A.phase === 'focus') { key = A.species + Math.floor(p * 400); plantHTML = () => growthSVG(A.species, p); }
+    else { key = 'break-' + A.species; plantHTML = () => growthSVG(A.species, 1); }
+    if (!A.awayAt) document.title = `${fmtClock(remaining)} · ${A.phase === 'focus' ? 'Enfoque' : 'Descanso'}`;
+  }
+  ring.style.strokeDashoffset = (A && A.phase === 'break' ? C * p : C * (1 - p)).toFixed(1);
+  $('#timeText').textContent = fmtClock(remaining);
+  if (key !== lastPlantKey) { lastPlantKey = key; $('#plantView').innerHTML = plantHTML(); }
+}
+
+/* =============================================================================
+   RENDER — VISTA ENFOQUE
+   ============================================================================= */
+function renderFocus() {
+  const running = !!A, s = S.settings, cfg = currentConfig();
+  document.body.classList.toggle('is-running', running);
+  document.body.classList.toggle('is-break', !!A && A.phase === 'break');
+
+  $$('#modeSeg .seg-btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === s.mode)));
+  $('#customSmall').textContent = `${s.customFocus} · ${s.customBreak}`;
+  $('#customCard').hidden = s.mode !== 'custom';
+  $('#cFocus').value = s.customFocus; $('#cBreak').value = s.customBreak;
+  $('#cFocusVal').textContent = `${s.customFocus} min`; $('#cBreakVal').textContent = `${s.customBreak} min`;
+  $('#rewardNote').textContent = `Recompensa: ${CATS[cfg.cat].label} (menos de 40 min = Planta · 40–74 = Árbol grande · 75+ = Ancestral)`;
+  $('#strictToggle').checked = s.strict;
+  $$('#ambientChips .chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.amb === s.ambient)));
+  $('#volume').value = s.volume;
+
+  renderSpeciesRow(); renderTagChips(); renderTaskPick(); renderPills();
+
+  // Texto secundario
+  let sub;
+  if (!A) sub = `${cfg.focus} min de enfoque · ${cfg.brk} min de descanso → ${SPECIES[chosenSpecies(cfg.cat)].name}`;
+  else if (A.phase === 'focus') sub = A.paused ? 'En pausa' : `Cultivando ${articleFor(A.species)} ${SPECIES[A.species].name.toLowerCase()}…`;
+  else sub = 'Descanso · respira, estírate, hidrátate';
+  $('#subText').textContent = sub;
+
+  // Acciones
+  const act = $('#actions');
+  if (!A) act.innerHTML = `<button class="btn btn-primary btn-lg" data-act="start"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Plantar y enfocar</button>`;
+  else if (A.phase === 'focus') act.innerHTML = `${A.strict ? '' : `<button class="btn" data-act="pause">${A.paused ? 'Reanudar' : 'Pausar'}</button>`}<button class="btn btn-danger" data-act="giveup">Rendirse</button>`;
+  else act.innerHTML = `<button class="btn" data-act="skipbreak">Saltar descanso</button>`;
+
+  lastPlantKey = '';
+  updateTimerDisplay();
+}
+
+function renderPills() {
+  const el = $('#statusPills'); if (!el) return;
+  if (!A) { el.innerHTML = ''; return; }
+  const out = [];
+  if (A.phase === 'focus') {
+    out.push(A.strict ? `<span class="pill ok">🔒 Modo estricto</span>` : `<span class="pill">Modo flexible</span>`);
+    const tag = tagById(A.tagId);
+    if (tag) out.push(`<span class="pill"><i class="dot" style="background:${safeColor(tag.color)}"></i><span class="clip">${esc(tag.name)}</span></span>`);
+    const task = taskById(A.taskId);
+    if (task) out.push(`<span class="pill"><span class="clip">✎ ${esc(task.title)}</span> <b class="num">${task.pomos || 0}/${task.est}</b></span>`);
+    if (A.warnings) out.push(`<span class="pill warn">⚠︎ ${A.warnings}</span>`);
+  }
+  if (Wake.active) out.push(`<span class="pill ok">☀︎ Pantalla activa</span>`);
+  else if (!Wake.supported && A.strict) out.push(`<span class="pill warn">Desactiva el bloqueo automático</span>`);
+  el.innerHTML = out.join('');
+}
+
+function renderSpeciesRow() {
+  const cat = currentConfig().cat, chosen = chosenSpecies(cat), hours = totalHours();
+  $('#catLabel').textContent = CATS[cat].short;
+  $('#speciesRow').innerHTML = SPECIES_ORDER.filter(id => SPECIES[id].cat === cat).map(id => {
+    const sp = SPECIES[id], locked = hours < sp.unlock;
+    return `<button class="sp-chip ${locked ? 'locked' : ''}" data-sp="${id}" aria-pressed="${id === chosen}" ${locked ? `aria-label="${sp.name}, se desbloquea a las ${sp.unlock} horas"` : ''}>
+      ${locked ? `<span class="lock">🔒${sp.unlock}h</span>` : ''}${speciesSVG(id)}<span>${sp.name}</span></button>`;
+  }).join('');
+}
+function renderTagChips() {
+  if (!tagById(S.settings.tagId) && S.tags[0]) S.settings.tagId = S.tags[0].id;
+  $('#tagChips').innerHTML = S.tags.map(t => `<button class="chip" data-tag="${esc(t.id)}" aria-pressed="${t.id === S.settings.tagId}"><i class="dot" style="background:${safeColor(t.color)}"></i>${esc(t.name)}</button>`).join('');
+}
+function renderTaskPick() {
+  const t = taskById(S.settings.activeTaskId);
+  if (t && t.done) S.settings.activeTaskId = null;
+  const task = taskById(S.settings.activeTaskId);
+  $('#taskPick').innerHTML = `<div class="grow"><div class="desc">Tarea activa</div><div class="title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${task ? esc(task.title) : 'Sin tarea vinculada'}</div></div>
+    ${task ? `<span class="pill num">${task.pomos || 0}/${task.est} 🍅</span>` : ''}<span class="chev">›</span>`;
+}
+
+function openTaskPicker() {
+  const pending = S.tasks.filter(t => !t.done).sort((a, b) => a.created - b.created);
+  const sheet = openSheet(`
+    <h2>Elegir tarea</h2>
+    <p>Cada pomodoro completado suma +1 a su progreso.</p>
+    <ul class="sheet-list">
+      <li><button data-task="" aria-pressed="${!S.settings.activeTaskId}">Sin tarea</button></li>
+      ${pending.map(t => { const tag = tagById(t.tagId); return `<li><button data-task="${esc(t.id)}" aria-pressed="${t.id === S.settings.activeTaskId}">
+        <i class="dot" style="background:${safeColor(tag && tag.color)}"></i><span style="flex:1;min-width:0;overflow-wrap:anywhere">${esc(t.title)}</span><span class="num muted">${t.pomos || 0}/${t.est} 🍅</span></button></li>`; }).join('')}
+    </ul>
+    <form id="quickTask" style="display:flex;gap:8px;margin-top:14px" autocomplete="off">
+      <input class="field" name="t" maxlength="140" placeholder="Crear tarea rápida…" aria-label="Nueva tarea">
+      <button class="btn btn-primary" type="submit">+</button>
+    </form>`);
+  sheet.el.addEventListener('click', e => {
+    const b = e.target.closest('[data-task]'); if (!b) return;
+    setActiveTask(b.dataset.task || null); sheet.close();
+  });
+  $('#quickTask', sheet.el).addEventListener('submit', e => {
+    e.preventDefault();
+    const v = e.target.t.value.trim(); if (!v) return;
+    const t = addTask(v, 1, S.settings.tagId);
+    setActiveTask(t.id); sheet.close();
+  });
+}
+function setActiveTask(id) {
+  S.settings.activeTaskId = id;
+  const t = taskById(id);
+  if (t && tagById(t.tagId)) S.settings.tagId = t.tagId;
+  saveSettings(); renderFocus(); renderTasks();
+}
+
+/* =============================================================================
+   RENDER — MI BOSQUE (terreno isométrico) + ESTADÍSTICAS
+   ============================================================================= */
+const RANGE_LABEL = { today:'Hoy', week:'Esta semana', month:'Este mes', all:'Histórico completo' };
+function seeded(i) { const x = Math.sin(i * 9301 + 49297) * 233280; return x - Math.floor(x); }
+
+function renderForest() {
+  const r = S.settings.forestRange || 'week';
+  $$('#rangeSeg .seg-btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.range === r)));
+  const from = rangeStart(r);
+  const list = S.sessions.filter(s => s.end >= from).sort((a, b) => a.end - b.end);
+  const alive = list.filter(s => s.status === 'alive'), dead = list.filter(s => s.status === 'withered');
+  $('#forestSubtitle').textContent = `${RANGE_LABEL[r]} · ${alive.length} ${alive.length === 1 ? 'planta viva' : 'plantas vivas'}, ${dead.length} ${dead.length === 1 ? 'marchita' : 'marchitas'}`;
+  $('#forestCaption').innerHTML = list.length ? `<span>Toca un árbol para ver sus detalles</span><span class="muted num">${fmtDur(aliveMinutes(list))} de enfoque</span>` : '';
+
+  const scroll = $('#forestScroll');
+  if (!list.length) {
+    scroll.innerHTML = `<div class="forest-empty">${growthSVG(chosenSpecies('plant'), .3)}<p>Aún no hay árboles ${r === 'all' ? 'en tu bosque' : 'en este periodo'}.<br>Completa una sesión de enfoque para plantar el primero.</p></div>`;
+  } else {
+    scroll.innerHTML = forestSVG(list);
+    if ($('#view-forest').classList.contains('active')) S.lastPlanted = null; // la animación "pop" se ve una sola vez
+  }
+  renderStats(list, alive, dead);
+}
+
+/** Construye un terreno isométrico n×n con los árboles en orden cronológico */
+function forestSVG(list) {
+  const n = Math.max(5, Math.ceil(Math.sqrt(list.length)));
+  const W = 80, H = 40, T = 16, padTop = 78, padX = 14;
+  const ox = padX + n * W / 2, oy = padTop;
+  const width = n * W + padX * 2, height = oy + n * H + T + 16;
+  const cell = (r, c) => ({ cx:ox + (c - r) * W / 2, cy:oy + (c + r) * H / 2 + H / 2 });
+  let g = '';
+  // caras laterales del bloque de tierra
+  const L = [ox - n * W / 2, oy + n * H / 2], B = [ox, oy + n * H], R = [ox + n * W / 2, oy + n * H / 2];
+  g += `<path d="M${L[0]} ${L[1]}L${B[0]} ${B[1]}V${B[1] + T}L${L[0]} ${L[1] + T}Z" style="fill:var(--dirt1)"/>`;
+  g += `<path d="M${B[0]} ${B[1]}L${R[0]} ${R[1]}V${R[1] + T}L${B[0]} ${B[1] + T}Z" style="fill:var(--dirt2)"/>`;
+  // baldosas de césped
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const { cx, cy } = cell(r, c);
+    g += `<path d="M${cx} ${cy - H / 2}L${cx + W / 2} ${cy}L${cx} ${cy + H / 2}L${cx - W / 2} ${cy}Z" style="fill:var(${(r + c) % 2 ? '--grass1' : '--grass2'})"/>`;
+  }
+  // árboles: se colocan por orden cronológico y se dibujan por profundidad (r+c)
+  const items = list.map((s, i) => ({ s, r:Math.floor(i / n), c:i % n }));
+  const occupied = new Set(items.map(it => `${it.r},${it.c}`));
+  const deco = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (occupied.has(`${r},${c}`)) continue;
+    const k = seeded(r * 31 + c * 17);
+    if (k < .22) deco.push({ r, c, k });
+  }
+  const drawables = [...items.map(it => ({ ...it, type:'tree' })), ...deco.map(d => ({ ...d, type:'deco' }))]
+    .sort((a, b) => (a.r + a.c) - (b.r + b.c) || a.c - b.c);
+  for (const d of drawables) {
+    const { cx, cy } = cell(d.r, d.c);
+    if (d.type === 'deco') {
+      const x = cx + (d.k - .1) * 30, y = cy + 2;
+      g += d.k < .1
+        ? `<path d="M${x - 4} ${y}q2 -7 3 0q1 -9 3 0q2 -6 3 0" stroke="#5D8A4C" stroke-width="1.4" fill="none" opacity=".75"/>`
+        : `<ellipse cx="${x}" cy="${y}" rx="4" ry="2.6" fill="#9A9488" opacity=".8"/><ellipse cx="${x - 1}" cy="${y - 1}" rx="2" ry="1" fill="#C9C3B6" opacity=".7"/>`;
+      continue;
+    }
+    const s = d.s, size = (CATS[s.cat] || CATS.tree).size;
+    const sp = SPECIES[s.species] || SPECIES.roble;
+    g += `<g class="tree-hit" data-sid="${esc(s.id)}" role="button" tabindex="0" aria-label="${esc(sp.name)}, ${esc(fmtDate(s.end))}">
+      <ellipse class="tree-shadow" cx="${cx}" cy="${cy + 1}" rx="${W * .26}" ry="${H * .2}" fill="rgba(0,0,0,.16)"/>
+      <g class="${s.id === S.lastPlanted ? 'pop' : ''}"><svg x="${cx - size / 2}" y="${cy - size * .95 + 2}" width="${size}" height="${size}" viewBox="0 0 100 100" overflow="visible">${sp.draw(1, true)}</svg></g></g>`;
+  }
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:max(100%, ${n * 46}px);max-width:${Math.max(560, n * 92)}px" role="img" aria-label="Bosque con ${list.length} elementos">${g}</svg>`;
+}
+
+function openTreeDetail(id) {
+  const s = S.sessions.find(x => x.id === id); if (!s) return;
+  const sp = SPECIES[s.species] || SPECIES.roble, tag = tagById(s.tagId);
+  const task = s.taskTitle || (taskById(s.taskId) || {}).title;
+  openSheet(`
+    <div class="center">${speciesSVG(s.species, 'hero-tree')}
+      <h2>${s.status === 'alive' ? esc(sp.name) : `Tronco seco <span class="muted" style="font-weight:500">(${esc((SPECIES[s.intended] || {}).name || '')})</span>`}</h2>
+      <p>${s.status === 'alive' ? esc(CATS[s.cat] ? CATS[s.cat].label : '') : (s.reason === 'distraction' ? 'Marchito por distracción (más de 20 s fuera de la app)' : 'Marchito por abandono')}</p>
+    </div>
+    <dl class="kv">
+      <dt>Fecha</dt><dd>${esc(fmtDate(s.end))}</dd>
+      <dt>Duración</dt><dd>${s.status === 'alive' ? fmtDur(s.minutes) : `${fmtDur(s.elapsedMin || 0)} de ${fmtDur(s.plannedMin)}`}</dd>
+      <dt>Etiqueta</dt><dd>${tag ? `<i class="dot" style="background:${safeColor(tag.color)}"></i> ${esc(tag.name)}` : '—'}</dd>
+      <dt>Tarea</dt><dd>${task ? esc(task) : '—'}</dd>
+      <dt>Modo</dt><dd>${esc((MODES[s.mode] || {}).label || '—')}${s.strict ? ' · estricto' : ''}${s.warnings ? ` · ${s.warnings} avisos` : ''}</dd>
+    </dl>
+    <div class="sheet-actions"><button class="btn btn-block" data-close>Cerrar</button></div>`);
+}
+
+function renderStats(list, alive, dead) {
+  const mins = aliveMinutes(list), st = streaks();
+  const rate = list.length ? Math.round(alive.length / list.length * 100) : null;
+  $('#statCards').innerHTML = `
+    <div class="card stat"><div class="label">Horas enfocadas</div><div class="value">${fmtHours(mins)}<span style="font-size:16px"> h</span></div><div class="hint">${RANGE_LABEL[S.settings.forestRange]}</div></div>
+    <div class="card stat"><div class="label">Racha actual</div><div class="value">${st.current}<span style="font-size:16px"> ${st.current === 1 ? 'día' : 'días'}</span></div><div class="hint">Mejor: ${st.best} ${st.best === 1 ? 'día' : 'días'}</div></div>
+    <div class="card stat"><div class="label">Éxito</div><div class="value">${rate === null ? '—' : rate + '<span style="font-size:16px">%</span>'}</div><div class="hint">vivos vs. marchitos</div></div>
+    <div class="card stat"><div class="label">Bosque</div><div class="value">${alive.length}<span style="font-size:16px"> 🌳</span></div><div class="hint">${dead.length} ${dead.length === 1 ? 'tronco seco' : 'troncos secos'}</div></div>`;
+
+  // Distribución por etiqueta
+  const byTag = new Map();
+  alive.forEach(s => byTag.set(s.tagId || '', (byTag.get(s.tagId || '') || 0) + s.minutes));
+  const rows = [...byTag.entries()].sort((a, b) => b[1] - a[1]);
+  const max = rows.length ? rows[0][1] : 1;
+  $('#tagBars').innerHTML = rows.length ? rows.map(([id, m]) => {
+    const t = tagById(id) || { name:'Sin etiqueta', color:'#7A8B99' };
+    return `<div class="bar-row"><div class="name"><i class="dot" style="background:${safeColor(t.color)}"></i><span>${esc(t.name)}</span></div><span class="amt">${fmtDur(m)} · ${Math.round(m / mins * 100)}%</span>
+      <div class="bar"><i style="width:${(m / max * 100).toFixed(1)}%;background:${safeColor(t.color)}"></i></div></div>`;
+  }).join('') : `<p class="empty-note">Sin sesiones completadas en este periodo.</p>`;
+
+  // Últimos 7 días (global)
+  const days = [];
+  for (let i = 6; i >= 0; i--) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i); days.push(d); }
+  const per = days.map(d => aliveMinutes(S.sessions.filter(s => dayKey(s.end) === dayKey(d))));
+  const wmax = Math.max(30, ...per);
+  $('#weekChart').innerHTML = `<div class="week">${days.map((d, i) => `<div class="col"><span class="v">${per[i] ? (per[i] >= 60 ? fmtHours(per[i]) + 'h' : per[i] + 'm') : ''}</span>
+    <div class="b ${per[i] ? '' : 'zero'}" style="height:${Math.max(3, per[i] / wmax * 100).toFixed(1)}%"></div>
+    <span class="d">${d.toLocaleDateString('es', { weekday:'narrow' })}</span></div>`).join('')}</div>`;
+
+  // Catálogo y próximo desbloqueo
+  const h = totalHours();
+  const next = SPECIES_ORDER.map(id => SPECIES[id]).filter(sp => sp.unlock > h).sort((a, b) => a.unlock - b.unlock)[0];
+  $('#nextUnlock').innerHTML = next ? `<div class="progress-next">Próxima especie: <b>${next.name}</b> a las ${next.unlock} h · llevas ${fmtHours(h * 60)} h
+    <div class="bar"><i style="width:${(h / next.unlock * 100).toFixed(1)}%;background:var(--accent)"></i></div></div>` : `<div class="progress-next">🌟 ¡Has desbloqueado todas las especies!</div>`;
+  $('#catalog').innerHTML = SPECIES_ORDER.map(id => {
+    const sp = SPECIES[id], locked = h < sp.unlock;
+    const count = S.sessions.filter(s => s.species === id && s.status === 'alive').length;
+    return `<div class="cat-item ${locked ? 'locked' : ''}">${speciesSVG(id)}<div class="n">${sp.name}</div>
+      <div class="k">${locked ? `🔒 ${sp.unlock} h` : `${CATS[sp.cat].short} · ×${count}`}</div></div>`;
+  }).join('');
+}
+
+/* =============================================================================
+   TAREAS Y ETIQUETAS
+   ============================================================================= */
+let newTaskEst = 1, newTagColor = TAG_COLORS[4];
+function addTask(title, est, tagId) {
+  const t = { id:uid('t'), title:title.slice(0, 140), est:clamp(est, 1, 20), pomos:0, tagId, done:false, created:Date.now(), doneAt:null };
+  S.tasks.push(t); persist(Store.put('tasks', t)); renderTasks();
+  return t;
+}
+function taskItem(t) {
+  const tag = tagById(t.tagId), active = t.id === S.settings.activeTaskId;
+  const pct = Math.min(100, (t.pomos || 0) / t.est * 100);
+  return `<li class="task ${t.done ? 'done' : ''} ${active && !t.done ? 'is-active' : ''}" data-id="${esc(t.id)}">
+    <button class="check" data-tact="${t.done ? 'undo' : 'complete'}" aria-label="${t.done ? 'Marcar como pendiente' : 'Completar tarea'}"><svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
+    <button class="task-main" data-tact="edit">
+      <div class="task-title">${esc(t.title)}</div>
+      <div class="task-meta">${tag ? `<span><i class="dot" style="background:${safeColor(tag.color)}"></i> ${esc(tag.name)}</span>` : ''}<span class="pomo">${t.pomos || 0}/${t.est} 🍅</span></div>
+      ${t.done ? '' : `<div class="task-bar"><i style="width:${pct}%"></i></div>`}
+    </button>
+    ${t.done ? '' : `<button class="focus-btn" data-tact="focus">${active ? 'Activa' : 'Enfocar'}</button>`}
+  </li>`;
+}
+function renderTasks() {
+  const pending = S.tasks.filter(t => !t.done).sort((a, b) => a.created - b.created);
+  const done = S.tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  $('#taskList').innerHTML = pending.length ? pending.map(taskItem).join('') : `<li class="empty-note" style="padding:14px 4px">No tienes tareas pendientes. Añade una arriba ✨</li>`;
+  $('#doneList').innerHTML = done.map(taskItem).join('');
+  $('#doneWrap').hidden = !done.length;
+  $('#doneSummary').textContent = `Completadas (${done.length})`;
+  $('#taskEst').textContent = `${newTaskEst} 🍅`;
+  const sel = $('#taskTag'), cur = sel.value || S.settings.tagId;
+  sel.innerHTML = S.tags.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+  sel.value = tagById(cur) ? cur : (S.tags[0] || {}).id || '';
+  $('#tagList').innerHTML = S.tags.map(t => `<li><i class="dot" style="background:${safeColor(t.color)};width:14px;height:14px"></i><span class="grow">${esc(t.name)}</span>
+    <button class="icon-btn" data-deltag="${esc(t.id)}" aria-label="Eliminar etiqueta ${esc(t.name)}" ${S.tags.length <= 1 ? 'disabled' : ''}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></li>`).join('');
+  $('#tagSwatches').innerHTML = TAG_COLORS.map(c => `<button type="button" class="swatch" data-color="${c}" style="background:${c}" aria-pressed="${c === newTagColor}" aria-label="Color ${c}"></button>`).join('');
+}
+function leafBurst(x, y) {
+  for (let i = 0; i < 10; i++) {
+    const el = document.createElement('span'); el.className = 'leaf-burst';
+    const a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 50;
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.style.setProperty('--dx', `${Math.cos(a) * d}px`); el.style.setProperty('--dy', `${Math.sin(a) * d - 20}px`); el.style.setProperty('--r', `${Math.random() * 360}deg`);
+    if (i % 3 === 0) el.style.background = 'var(--amber)';
+    document.body.appendChild(el); setTimeout(() => el.remove(), 950);
+  }
+}
+function completeTask(id, btn) {
+  const t = taskById(id); if (!t) return;
+  const li = btn.closest('.task'); li.classList.add('completing');
+  const r = btn.getBoundingClientRect(); leafBurst(r.left + r.width / 2, r.top + r.height / 2);
+  vibrate(30);
+  setTimeout(() => {
+    t.done = true; t.doneAt = Date.now();
+    if (S.settings.activeTaskId === id && !(A && A.taskId === id)) { S.settings.activeTaskId = null; saveSettings(); }
+    persist(Store.put('tasks', t)); renderTasks(); renderTaskPick();
+    toast('✓ Tarea completada', 'ok', 2200);
+  }, 700);
+}
+function openTaskEditor(id) {
+  const t = taskById(id); if (!t) return;
+  let est = t.est;
+  const sheet = openSheet(`
+    <h2>Editar tarea</h2>
+    <form id="editTask" class="add-task" style="margin-top:14px" autocomplete="off">
+      <input class="field" name="title" maxlength="140" value="${esc(t.title)}" aria-label="Título">
+      <div class="add-row">
+        <div class="stepper"><button type="button" data-s="-1" aria-label="Menos">−</button><output class="num" id="eEst">${est} 🍅</output><button type="button" data-s="1" aria-label="Más">+</button></div>
+        <select class="field" name="tag" aria-label="Etiqueta">${S.tags.map(g => `<option value="${esc(g.id)}" ${g.id === t.tagId ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select>
+      </div>
+      <p class="muted" style="font-size:14px;margin:0">Progreso: <b class="num">${t.pomos || 0}/${t.est} 🍅</b></p>
+      <div class="sheet-actions" style="margin-top:8px">
+        <button class="btn btn-primary btn-block" type="submit">Guardar</button>
+        <button class="btn btn-danger btn-block" type="button" data-del>Eliminar tarea</button>
+      </div>
+    </form>`);
+  const f = $('#editTask', sheet.el);
+  f.addEventListener('click', async e => {
+    const s = e.target.closest('[data-s]');
+    if (s) { est = clamp(est + +s.dataset.s, 1, 20); $('#eEst', sheet.el).textContent = `${est} 🍅`; }
+    if (e.target.closest('[data-del]')) {
+      if (A && A.taskId === id) { toast('No puedes eliminar la tarea de la sesión en curso', 'warn'); return; }
+      sheet.close();
+      if (await confirmSheet({ title:'¿Eliminar tarea?', text:`"${t.title}" se eliminará. Los árboles ya plantados se conservan.`, ok:'Eliminar', danger:true })) {
+        S.tasks = S.tasks.filter(x => x.id !== id);
+        if (S.settings.activeTaskId === id) { S.settings.activeTaskId = null; saveSettings(); }
+        persist(Store.del('tasks', id)); renderTasks(); renderTaskPick();
+      }
+    }
+  });
+  f.addEventListener('submit', e => {
+    e.preventDefault();
+    const title = f.title.value.trim(); if (!title) return;
+    t.title = title.slice(0, 140); t.est = est; t.tagId = f.tag.value;
+    persist(Store.put('tasks', t)); renderTasks(); renderFocus(); sheet.close();
+  });
+}
+
+/* =============================================================================
+   HOJAS MODALES Y TOASTS
+   ============================================================================= */
+function openSheet(html, { dismissable = true } = {}) {
+  const wrap = document.createElement('div');
+  wrap.className = 'sheet-wrap';
+  wrap.innerHTML = `<div class="sheet-backdrop"></div><div class="sheet" role="dialog" aria-modal="true"><div class="sheet-grip"></div>${html}</div>`;
+  $('#sheetRoot').appendChild(wrap);
+  requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
+  let closed = false;
+  const api = {
+    el:wrap.querySelector('.sheet'),
+    close() { if (closed) return; closed = true; wrap.classList.remove('open'); setTimeout(() => wrap.remove(), 300); if (api.onClose) api.onClose(); },
+    onClose:null
+  };
+  if (dismissable) wrap.querySelector('.sheet-backdrop').addEventListener('click', () => api.close());
+  wrap.addEventListener('click', e => { if (e.target.closest('[data-close]')) api.close(); });
+  const onKey = e => { if (e.key === 'Escape' && dismissable) { api.close(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+  return api;
+}
+function confirmSheet({ title, text, ok = 'Aceptar', cancel = 'Cancelar', danger = false }) {
+  return new Promise(res => {
+    let answered = false;
+    const s = openSheet(`<h2>${esc(title)}</h2><p>${esc(text)}</p><div class="sheet-actions">
+      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'} btn-block" data-ok>${esc(ok)}</button>
+      <button class="btn btn-ghost btn-block" data-close>${esc(cancel)}</button></div>`);
+    s.onClose = () => { if (!answered) res(false); };
+    $('[data-ok]', s.el).addEventListener('click', () => { answered = true; res(true); s.close(); });
+  });
+}
+function toast(msg, type = 'info', ms = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`; el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 260); }, ms);
+}
+
+/* =============================================================================
+   AJUSTES, RESPALDO (EXPORTAR / IMPORTAR) Y TEMA
+   ============================================================================= */
+function applyTheme() {
+  const t = S.settings.theme;
+  if (t === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', t);
+  const dark = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
+  $$('meta[name="theme-color"]').forEach(m => m.setAttribute('content', dark ? '#111714' : '#F4EFE3'));
+}
+
+function buildBackup() {
+  return { app:'bosque-enfoque', version:1, exportedAt:new Date().toISOString(),
+    data:{ sessions:S.sessions, tasks:S.tasks, tags:S.tags, settings:S.settings } };
+}
+async function exportBackup() {
+  const name = `bosque-respaldo-${dayKey(Date.now())}.json`;
+  const json = JSON.stringify(buildBackup(), null, 2);
+  const file = new File([json], name, { type:'application/json' });
+  const touch = matchMedia('(pointer: coarse)').matches;
+  // En iPhone/iPad la hoja de compartir permite "Guardar en Archivos" → iCloud Drive
+  if (touch && navigator.canShare && navigator.canShare({ files:[file] })) {
+    try { await navigator.share({ files:[file], title:'Respaldo de mi bosque' }); markBackup(); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  markBackup();
+}
+function markBackup() { S.settings.lastBackup = Date.now(); saveSettings(); toast('Respaldo exportado ✓', 'ok'); }
+
+/* Validación estricta del archivo importado */
+function cleanSession(s) {
+  if (!s || typeof s.id !== 'string' || !Number.isFinite(+s.start) || !Number.isFinite(+s.end)) return null;
+  const status = s.status === 'withered' ? 'withered' : 'alive';
+  const species = status === 'withered' ? 'marchito' : (SPECIES[s.species] && s.species !== 'marchito' ? s.species : 'roble');
+  return {
+    id:s.id.slice(0, 64), status, start:+s.start, end:+s.end,
+    minutes:status === 'alive' ? clamp(+s.minutes || 0, 0, 600) : 0, plannedMin:clamp(+s.plannedMin || +s.minutes || 0, 0, 600),
+    elapsedMin:+s.elapsedMin || 0, cat:status === 'withered' ? 'withered' : (CATS[s.cat] ? s.cat : SPECIES[species].cat),
+    species, intended:SPECIES[s.intended] ? s.intended : undefined, tagId:typeof s.tagId === 'string' ? s.tagId : null,
+    taskId:typeof s.taskId === 'string' ? s.taskId : null, taskTitle:typeof s.taskTitle === 'string' ? s.taskTitle.slice(0, 140) : null,
+    mode:MODES[s.mode] ? s.mode : 'custom', strict:!!s.strict, warnings:+s.warnings || 0,
+    reason:s.reason === 'abandon' ? 'abandon' : (status === 'withered' ? 'distraction' : undefined)
+  };
+}
+function cleanTask(t) {
+  if (!t || typeof t.id !== 'string' || typeof t.title !== 'string') return null;
+  return { id:t.id.slice(0, 64), title:t.title.slice(0, 140), est:clamp(+t.est || 1, 1, 20), pomos:Math.max(0, +t.pomos || 0),
+    tagId:typeof t.tagId === 'string' ? t.tagId : null, done:!!t.done, created:+t.created || Date.now(), doneAt:+t.doneAt || null };
+}
+function cleanTag(t) {
+  if (!t || typeof t.id !== 'string' || typeof t.name !== 'string') return null;
+  return { id:t.id.slice(0, 64), name:t.name.slice(0, 32), color:safeColor(t.color) };
+}
+async function importBackup(file, mode) {
+  let obj;
+  try { obj = JSON.parse(await file.text()); } catch { toast('El archivo no es un JSON válido', 'error'); return; }
+  const d = obj && obj.data;
+  if (!obj || obj.app !== 'bosque-enfoque' || !d || !Array.isArray(d.sessions)) { toast('Este archivo no es un respaldo de Bosque', 'error'); return; }
+  const sessions = d.sessions.map(cleanSession).filter(Boolean);
+  const tasks = (d.tasks || []).map(cleanTask).filter(Boolean);
+  const tags = (d.tags || []).map(cleanTag).filter(Boolean);
+  try {
+    if (mode === 'replace') {
+      await Promise.all(['sessions', 'tasks', 'tags'].map(s => Store.clear(s)));
+      S.sessions = sessions; S.tasks = tasks; S.tags = tags.length ? tags : DEFAULT_TAGS();
+      if (d.settings) S.settings = mergeSettings(Object.assign({}, d.settings, { theme:S.settings.theme }));
+    } else {
+      const merge = (cur, inc) => { const m = new Map(cur.map(o => [o.id, o])); inc.forEach(o => m.set(o.id, o)); return [...m.values()]; };
+      S.sessions = merge(S.sessions, sessions); S.tasks = merge(S.tasks, tasks); S.tags = merge(S.tags, tags);
+    }
+    S.sessions.sort((a, b) => a.start - b.start);
+    await Promise.all([Store.putMany('sessions', S.sessions), Store.putMany('tasks', S.tasks), Store.putMany('tags', S.tags)]);
+    await saveSettings();
+    applyTheme(); renderAll();
+    toast(`Respaldo restaurado: ${sessions.length} árboles, ${tasks.length} tareas`, 'ok', 4000);
+  } catch (e) { console.error(e); toast('No se pudo importar el respaldo', 'error'); }
+}
+
+function openSettings() {
+  const s = S.settings, focusRunning = A && A.phase === 'focus';
+  const last = s.lastBackup ? new Date(s.lastBackup).toLocaleDateString('es', { day:'numeric', month:'long', year:'numeric' }) : 'nunca';
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const sheet = openSheet(`
+    <h2>Ajustes</h2>
+    <div class="section"><h3>Apariencia</h3>
+      <div class="seg" id="themeSeg">${[['auto','Automático'],['light','Claro'],['dark','Oscuro']].map(([v, l]) => `<button class="seg-btn" data-theme="${v}" aria-pressed="${s.theme === v}">${l}</button>`).join('')}</div>
+    </div>
+    <div class="section"><h3>Sesiones</h3>
+      <div class="row-card" style="padding:6px 0"><div class="grow"><div class="title">Iniciar descanso automáticamente</div><div class="desc">Al terminar un pomodoro</div></div><label class="switch"><input type="checkbox" id="setAuto" ${s.autoBreak ? 'checked' : ''}><span></span></label></div>
+      <div class="row-card" style="padding:6px 0"><div class="grow"><div class="title">Sonido al completar</div><div class="desc">Campana al terminar enfoque o descanso</div></div><label class="switch"><input type="checkbox" id="setChime" ${s.chime ? 'checked' : ''}><span></span></label></div>
+    </div>
+    <div class="section"><h3>Respaldo (iCloud Drive / Archivos)</h3>
+      <p style="font-size:14px">Safari puede borrar los datos de apps web tras semanas sin uso. Exporta tu bosque y guárdalo en iCloud Drive para restaurarlo cuando quieras.</p>
+      <p style="font-size:13px" class="muted">Último respaldo: <b>${esc(last)}</b> · Almacenamiento: ${Store.backend}</p>
+      ${focusRunning ? `<p style="font-size:13px;color:var(--amber)">Termina la sesión en curso antes de exportar o importar (abrir Archivos contaría como distracción).</p>` : ''}
+      <div class="sheet-actions">
+        <button class="btn btn-primary btn-block" id="doExport" ${focusRunning ? 'disabled' : ''}>Exportar respaldo (.json)</button>
+        <button class="btn btn-block" id="doImport" ${focusRunning ? 'disabled' : ''}>Importar respaldo…</button>
+      </div>
+    </div>
+    ${standalone ? '' : `<div class="section"><h3>Instalar en iPhone / iPad / Mac</h3>
+      <p style="font-size:14px">En Safari toca <b>Compartir</b> → <b>Agregar a pantalla de inicio</b> (en Mac: <b>Archivo → Agregar al Dock</b>). Se abrirá a pantalla completa y funcionará sin conexión.</p></div>`}
+    <div class="section"><h3>Zona de peligro</h3>
+      <button class="btn btn-danger btn-block" id="doReset" ${A ? 'disabled' : ''}>Borrar todos los datos</button>
+    </div>
+    <div class="sheet-actions"><button class="btn btn-ghost btn-block" data-close>Listo</button></div>`);
+  const el = sheet.el;
+  $('#themeSeg', el).addEventListener('click', e => {
+    const b = e.target.closest('[data-theme]'); if (!b) return;
+    s.theme = b.dataset.theme; saveSettings(); applyTheme();
+    $$('#themeSeg .seg-btn', el).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  });
+  $('#setAuto', el).addEventListener('change', e => { s.autoBreak = e.target.checked; saveSettings(); });
+  $('#setChime', el).addEventListener('change', e => { s.chime = e.target.checked; saveSettings(); });
+  $('#doExport', el).addEventListener('click', exportBackup);
+  $('#doImport', el).addEventListener('click', () => { sheet.close(); $('#importInput').value = ''; $('#importInput').click(); });
+  $('#doReset', el).addEventListener('click', async () => {
+    sheet.close();
+    const ok = await confirmSheet({ title:'¿Borrar todo?', text:'Se eliminarán tu bosque, tareas, etiquetas y ajustes de este dispositivo. Esta acción no se puede deshacer. Te recomendamos exportar un respaldo primero.', ok:'Borrar definitivamente', danger:true });
+    if (!ok) return;
+    await Promise.all(['sessions', 'tasks', 'tags', 'meta'].map(x => Store.clear(x).catch(() => {})));
+    try { localStorage.removeItem(ACTIVE_KEY); } catch {}
+    location.reload();
+  });
+}
+async function onImportFile(e) {
+  const file = e.target.files && e.target.files[0]; if (!file) return;
+  const sheet = openSheet(`
+    <h2>Importar respaldo</h2>
+    <p>Archivo: <b>${esc(file.name)}</b></p>
+    <div class="sheet-actions">
+      <button class="btn btn-primary btn-block" data-mode="merge">Fusionar con mis datos actuales</button>
+      <button class="btn btn-danger btn-block" data-mode="replace">Reemplazar todo con el respaldo</button>
+      <button class="btn btn-ghost btn-block" data-close>Cancelar</button>
+    </div>`);
+  sheet.el.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-mode]'); if (!b) return;
+    sheet.close(); importBackup(file, b.dataset.mode);
+  });
+}
+
+/* =============================================================================
+   NAVEGACIÓN Y EVENTOS
+   ============================================================================= */
+function showView(name) {
+  if (!['focus', 'forest', 'tasks'].includes(name)) name = 'focus';
+  $$('.nav-btn').forEach(b => b.toggleAttribute('aria-current', false));
+  $(`.nav-btn[data-view="${name}"]`).setAttribute('aria-current', 'page');
+  $$('.view').forEach(v => v.classList.toggle('active', v.id === `view-${name}`));
+  if (name === 'forest') renderForest();
+  try { localStorage.setItem(VIEW_KEY, name); } catch {}
+  window.scrollTo(0, 0);
+}
+function renderAll() { renderFocus(); renderTasks(); renderForest(); }
+
+function bindEvents() {
+  $$('.nav-btn').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+  $('#settingsBtn').addEventListener('click', openSettings);
+  $('#importInput').addEventListener('change', onImportFile);
+
+  // --- Enfoque ---
+  $('#modeSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-mode]'); if (!b || A) return;
+    S.settings.mode = b.dataset.mode; saveSettings(); renderFocus();
+  });
+  const slide = (id, key) => {
+    $(id).addEventListener('input', e => { S.settings[key] = +e.target.value; renderFocus(); });
+    $(id).addEventListener('change', saveSettings);
+  };
+  slide('#cFocus', 'customFocus'); slide('#cBreak', 'customBreak');
+  $('#speciesRow').addEventListener('click', e => {
+    const b = e.target.closest('[data-sp]'); if (!b) return;
+    const sp = SPECIES[b.dataset.sp];
+    if (!isUnlocked(b.dataset.sp)) { toast(`🔒 ${sp.name} se desbloquea con ${sp.unlock} h de enfoque`, 'info'); return; }
+    S.settings.species[sp.cat] = b.dataset.sp; saveSettings(); renderFocus();
+  });
+  $('#tagChips').addEventListener('click', e => {
+    const b = e.target.closest('[data-tag]'); if (!b) return;
+    S.settings.tagId = b.dataset.tag; saveSettings(); renderTagChips();
+  });
+  $('#taskPick').addEventListener('click', openTaskPicker);
+  $('#strictToggle').addEventListener('change', e => { S.settings.strict = e.target.checked; saveSettings(); });
+  $('#ambientChips').addEventListener('click', e => {
+    const b = e.target.closest('[data-amb]'); if (!b) return;
+    S.settings.ambient = b.dataset.amb; saveSettings();
+    $$('#ambientChips .chip').forEach(c => c.setAttribute('aria-pressed', String(c === b)));
+    if (A) Sound.startAmbient(S.settings.ambient, S.settings.volume);
+    else if (S.settings.ambient !== 'none') Sound.preview(S.settings.ambient, S.settings.volume);
+    else Sound.stopAmbient();
+  });
+  $('#volume').addEventListener('input', e => { S.settings.volume = +e.target.value; Sound.setVolume(S.settings.volume); });
+  $('#volume').addEventListener('change', saveSettings);
+  $('#actions').addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const act = b.dataset.act;
+    if (act === 'start') startFocus();
+    else if (act === 'pause') pauseToggle();
+    else if (act === 'skipbreak') endRunning();
+    else if (act === 'giveup') {
+      if (!A) return;
+      if (Date.now() - A.startAt < CANCEL_FREE_MS) { endRunning(); toast('Sesión cancelada sin penalización'); return; }
+      const ok = await confirmSheet({ title:'¿Rendirte?', text:'Si abandonas ahora, el progreso se perderá y se plantará un tronco seco en tu bosque.', ok:'Sí, rendirme', cancel:'Seguir enfocado', danger:true });
+      if (ok && A && A.phase === 'focus') wither('abandon');
+    }
+  });
+  $('#dangerBack').addEventListener('click', () => { Sound.ensure(); onBack(); });
+
+  // --- Bosque ---
+  $('#rangeSeg').addEventListener('click', e => {
+    const b = e.target.closest('[data-range]'); if (!b) return;
+    S.settings.forestRange = b.dataset.range; saveSettings(); renderForest();
+  });
+  $('#forestScroll').addEventListener('click', e => { const g = e.target.closest('[data-sid]'); if (g) openTreeDetail(g.dataset.sid); });
+  $('#forestScroll').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const g = e.target.closest('[data-sid]'); if (g) { e.preventDefault(); openTreeDetail(g.dataset.sid); } } });
+
+  // --- Tareas ---
+  $('#taskForm').addEventListener('click', e => {
+    const b = e.target.closest('[data-step]'); if (!b) return;
+    newTaskEst = clamp(newTaskEst + +b.dataset.step, 1, 20); $('#taskEst').textContent = `${newTaskEst} 🍅`;
+  });
+  $('#taskForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const v = $('#taskTitle').value.trim(); if (!v) { $('#taskTitle').focus(); return; }
+    addTask(v, newTaskEst, $('#taskTag').value);
+    $('#taskTitle').value = ''; newTaskEst = 1; renderTasks();
+  });
+  const onTaskClick = e => {
+    const b = e.target.closest('[data-tact]'); if (!b) return;
+    const id = b.closest('.task').dataset.id, act = b.dataset.tact;
+    if (act === 'complete') completeTask(id, b);
+    else if (act === 'undo') { const t = taskById(id); t.done = false; t.doneAt = null; persist(Store.put('tasks', t)); renderTasks(); }
+    else if (act === 'edit') openTaskEditor(id);
+    else if (act === 'focus') { if (A) { toast('Hay una sesión en curso'); return; } setActiveTask(id); showView('focus'); }
+  };
+  $('#taskList').addEventListener('click', onTaskClick);
+  $('#doneList').addEventListener('click', onTaskClick);
+  $('#tagSwatches').addEventListener('click', e => {
+    const b = e.target.closest('[data-color]'); if (!b) return;
+    newTagColor = b.dataset.color; $$('#tagSwatches .swatch').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  });
+  $('#tagForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('#tagName').value.trim(); if (!name) return;
+    const t = { id:uid('tag'), name:name.slice(0, 32), color:safeColor(newTagColor) };
+    S.tags.push(t); persist(Store.put('tags', t));
+    $('#tagName').value = ''; renderTasks(); renderTagChips();
+  });
+  $('#tagList').addEventListener('click', async e => {
+    const b = e.target.closest('[data-deltag]'); if (!b || S.tags.length <= 1) return;
+    const t = tagById(b.dataset.deltag);
+    if (!await confirmSheet({ title:`¿Eliminar "${t.name}"?`, text:'Las sesiones y tareas con esta etiqueta se conservarán como "Sin etiqueta".', ok:'Eliminar', danger:true })) return;
+    S.tags = S.tags.filter(x => x.id !== t.id); persist(Store.del('tags', t.id));
+    if (S.settings.tagId === t.id) { S.settings.tagId = S.tags[0].id; saveSettings(); }
+    renderTasks(); renderFocus();
+  });
+
+  // --- Detección de distracción ---
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) onAway();
+    else { onBack(); if (Wake.want) Wake.acquire(); Sound.ensure(); if (A) updateTimerDisplay(); }
+  });
+  window.addEventListener('blur', onAway);
+  window.addEventListener('focus', onBack);
+  window.addEventListener('pagehide', () => { if (A && A.phase === 'focus' && A.strict && !A.awayAt) { A.awayAt = Date.now(); saveActive(); } });
+  window.addEventListener('pageshow', e => { if (e.persisted) onBack(); });
+
+  // iOS: el audio solo se puede (re)activar tras un gesto del usuario
+  const unlockAudio = () => {
+    Sound.ensure();
+    if (A && S.settings.ambient !== 'none' && !Sound.playing()) Sound.startAmbient(S.settings.ambient, S.settings.volume);
+  };
+  document.addEventListener('pointerdown', unlockAudio, { passive:true });
+
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
+}
+
+/** Restaura una sesión en curso tras recarga o cierre de la app por iOS */
+function restoreActive() {
+  loadActive();
+  if (!A) return;
+  const now = Date.now();
+  if (A.phase === 'focus') {
+    if (A.strict && A.awayAt) {
+      const deadline = A.awayAt + GRACE_MS;
+      if (now >= A.endAt && A.endAt <= deadline) return completeFocus();
+      if (now >= deadline) return wither('distraction', deadline);
+      renderFocus(); Wake.acquire(); onBack();
+      return;
+    }
+    if (!A.paused && now >= A.endAt) return completeFocus();
+  } else if (now >= A.endAt) { A = null; saveActive(); return; }
+  renderFocus(); Wake.acquire();
+}
+
+function backupReminder() {
+  const total = S.sessions.length;
+  const last = S.settings.lastBackup || 0;
+  if (total >= 5 && Date.now() - last > 14 * 864e5) setTimeout(() => toast('💾 Han pasado más de 2 semanas sin respaldo. Exporta tu bosque en Ajustes.', 'info', 6000), 2500);
+}
+
+/* =============================================================================
+   ARRANQUE
+   ============================================================================= */
+async function init() {
+  applyTheme();
+  await Store.open();
+  try {
+    const [sessions, tasks, tags, meta] = await Promise.all(['sessions', 'tasks', 'tags', 'meta'].map(s => Store.all(s)));
+    S.sessions = (sessions || []).sort((a, b) => a.start - b.start);
+    S.tasks = tasks || [];
+    S.tags = tags && tags.length ? tags : DEFAULT_TAGS();
+    if (!tags || !tags.length) persist(Store.putMany('tags', S.tags));
+    const set = (meta || []).find(m => m.id === 'settings');
+    S.settings = mergeSettings(set && set.value);
+  } catch (e) { console.error(e); toast('No se pudieron leer tus datos guardados', 'error', 5000); }
+  applyTheme();
+  bindEvents();
+  renderAll();
+  let view = 'focus'; try { view = localStorage.getItem(VIEW_KEY) || 'focus'; } catch {}
+  restoreActive();
+  showView(A ? 'focus' : view);
+  setInterval(tick, 250);
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+  backupReminder();
+}
+init();
+</script>
+</body>
+</html>
